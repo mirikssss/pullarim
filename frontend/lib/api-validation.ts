@@ -168,13 +168,8 @@ export const exportQuerySchema = z.object({
 
 // --- Import Payme ---
 // --- Domain validation helpers (used in routes with Supabase) ---
-type SupabaseClient = {
-  from: (table: string) => {
-    select: (cols?: string) => { eq: (col: string, val: unknown) => { maybeSingle: () => Promise<{ data: unknown }> } }
-  }
-}
-
-export async function categoryExists(supabase: SupabaseClient, categoryId: string): Promise<boolean> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function categoryExists(supabase: any, categoryId: string): Promise<boolean> {
   const { data } = await supabase.from("categories").select("id").eq("id", categoryId).maybeSingle()
   return !!data
 }

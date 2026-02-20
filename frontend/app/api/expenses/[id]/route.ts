@@ -7,6 +7,8 @@ import {
   zodErrorToFieldErrors,
   categoryExists,
 } from "@/lib/api-validation"
+import { upsertMerchantMemory } from "@/lib/payme-category-mapper"
+import { normalizeMerchant } from "@/lib/merchant-normalize"
 
 export async function PATCH(
   request: NextRequest,
@@ -42,6 +44,18 @@ export async function PATCH(
     }
   }
 
+  // Fetch current expense for learning loop (need merchant when category changes)
+  let currentMerchant: string | undefined
+  if (category_id !== undefined) {
+    const { data: existing } = await supabase
+      .from("expenses")
+      .select("merchant")
+      .eq("id", id)
+      .eq("user_id", user.id)
+      .single()
+    currentMerchant = existing?.merchant
+  }
+
   const updates: Record<string, unknown> = {}
   if (merchant !== undefined) updates.merchant = merchant
   if (category_id !== undefined) updates.category_id = category_id
@@ -63,6 +77,15 @@ export async function PATCH(
   if (!data) {
     return NextResponse.json({ error: "Not found" }, { status: 404 })
   }
+
+  // Learning loop: when user edits category, save to merchant memory (confidence=1.0)
+  if (category_id !== undefined && data.merchant) {
+    const m = normalizeMerchant((merchant ?? currentMerchant ?? data.merchant) as string)
+    if (m) {
+      await upsertMerchantMemory(supabase, user.id, m, category_id, -1)
+    }
+  }
+
   return NextResponse.json(data)
 }
 

@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect } from "react"
 import useSWR from "swr"
 import { motion, AnimatePresence } from "framer-motion"
-import { Upload, FileSpreadsheet, CheckCircle, Loader2, ArrowRight, ArrowLeft } from "lucide-react"
+import { Upload, FileSpreadsheet, CheckCircle, Loader2, ArrowRight, ArrowLeft, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { fetcher, categoriesKey } from "@/lib/api"
 import type { Category } from "@/lib/types"
@@ -19,6 +19,8 @@ type PaymePreviewRow = {
   merchant: string
   amount: number
   paymeCategory?: string
+  resolvedCategory?: string
+  resolvedSource?: "memory" | "mapping" | "rule" | "ai" | "default"
   note?: string
   external_id?: string
 }
@@ -39,6 +41,8 @@ export default function ImportPage() {
   const [uniquePaymeCategories, setUniquePaymeCategories] = useState<string[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [reprocessLoading, setReprocessLoading] = useState(false)
+  const [reprocessResult, setReprocessResult] = useState<{ total_in_other: number; updated: number } | null>(null)
 
   const { data: categories = [] } = useSWR<Category[]>(categoriesKey(), fetcher)
 
@@ -63,6 +67,8 @@ export default function ImportPage() {
     try {
       const formData = new FormData()
       formData.append("file", file)
+      formData.append("default_category_id", defaultCategoryId || categories[0]?.id || "")
+      formData.append("category_mapping", JSON.stringify({}))
       const res = await fetch("/api/import/payme/preview", {
         method: "POST",
         body: formData,
@@ -75,17 +81,15 @@ export default function ImportPage() {
       setPreviewRows(data.rows ?? [])
       setPreviewTotal(data.total ?? 0)
       setPreviewTotalSpend(data.totalSpend ?? 0)
-      const paymeCats = data.uniquePaymeCategories ?? []
-      setUniquePaymeCategories(paymeCats)
-      const defaultCat = categories[0]?.id ?? ""
-      setDefaultCategoryId(defaultCat)
+      setUniquePaymeCategories(data.uniquePaymeCategories ?? [])
+      setDefaultCategoryId((defaultCategoryId || categories[0]?.id) ?? "")
       setStep("preview")
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ошибка")
     } finally {
       setLoading(false)
     }
-  }, [file, categories])
+  }, [file, categories, defaultCategoryId])
 
   const handleCommit = useCallback(async () => {
     if (!file || !defaultCategoryId) {
@@ -117,6 +121,22 @@ export default function ImportPage() {
       setLoading(false)
     }
   }, [file, defaultCategoryId, importOnlySpisanie])
+
+  const handleReprocess = useCallback(async () => {
+    setReprocessLoading(true)
+    setReprocessResult(null)
+    setError(null)
+    try {
+      const res = await fetch("/api/import/payme/reprocess", { method: "POST" })
+      if (!res.ok) throw new Error("Ошибка перекатегоризации")
+      const data = await res.json()
+      setReprocessResult({ total_in_other: data.total_in_other, updated: data.updated })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Ошибка")
+    } finally {
+      setReprocessLoading(false)
+    }
+  }, [])
 
   const totalAmount = previewTotalSpend > 0 ? previewTotalSpend : previewRows.reduce((s, r) => s + r.amount, 0)
 
@@ -211,7 +231,9 @@ export default function ImportPage() {
                 <tr>
                   <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Дата</th>
                   <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Название</th>
-                  <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Категория Payme</th>
+                  <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Payme</th>
+                  <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">→ Категория</th>
+                  <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Источник</th>
                   <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground">Сумма</th>
                 </tr>
               </thead>
@@ -220,7 +242,17 @@ export default function ImportPage() {
                   <tr key={i} className="border-t border-border">
                     <td className="px-3 py-2 text-muted-foreground">{r.date}</td>
                     <td className="px-3 py-2 truncate max-w-[120px]">{r.merchant}</td>
-                    <td className="px-3 py-2 text-muted-foreground text-xs truncate max-w-[80px]">{r.paymeCategory || "—"}</td>
+                    <td className="px-3 py-2 text-muted-foreground text-xs truncate max-w-[70px]">{r.paymeCategory || "—"}</td>
+                    <td className="px-3 py-2 text-xs font-medium">{r.resolvedCategory || "—"}</td>
+                    <td className="px-3 py-2 text-xs text-muted-foreground">
+                      <span title={r.resolvedSource} className="capitalize">{r.resolvedSource === "memory" && "память"}
+                        {r.resolvedSource === "mapping" && "маппинг"}
+                        {r.resolvedSource === "rule" && "правило"}
+                        {r.resolvedSource === "ai" && "AI"}
+                        {r.resolvedSource === "default" && "по умолч."}
+                        {!r.resolvedSource && "—"}
+                      </span>
+                    </td>
                     <td className="px-3 py-2 text-right font-medium">{formatUZS(r.amount)}</td>
                   </tr>
                 ))}
@@ -287,9 +319,20 @@ export default function ImportPage() {
       <div className="sticky top-0 z-30 bg-background/80 backdrop-blur-lg border-b border-border">
         <div className="flex items-center justify-between px-4 h-14">
           <h1 className="text-lg font-semibold text-foreground">Импорт Payme</h1>
-          <Link href="/app/expenses">
-            <Button variant="ghost" size="sm">Назад</Button>
-          </Link>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleReprocess}
+              disabled={reprocessLoading}
+            >
+              {reprocessLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+              Перекатегоризовать 30 дней
+            </Button>
+            <Link href="/app/expenses">
+              <Button variant="ghost" size="sm">Назад</Button>
+            </Link>
+          </div>
         </div>
       </div>
 
@@ -318,6 +361,11 @@ export default function ImportPage() {
         {error && (
           <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
             {error}
+          </div>
+        )}
+        {reprocessResult && (
+          <div className="mb-4 p-3 rounded-lg bg-primary/10 text-primary text-sm">
+            Перекатегоризовано: {reprocessResult.updated} из {reprocessResult.total_in_other} в «Прочее»
           </div>
         )}
 

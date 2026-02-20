@@ -122,7 +122,7 @@ export async function POST(request: NextRequest) {
     .from("categories")
     .select("id, label")
     .eq("user_id", user.id)
-  const appCategories = [...(defaultCats ?? []), ...(userCats ?? [])]
+  const appCategories = [...(defaultCats ?? []), ...(userCats ?? [])] as { id: string; label: string }[]
 
   const rows: { merchant: string; amount: number; date: string; note: string; category_id: string; external_id: string }[] = []
   for (const raw of rawRows) {
@@ -147,16 +147,19 @@ export async function POST(request: NextRequest) {
     const note = [comment, requisites].filter(Boolean).join(" ").slice(0, 500)
     const card = String(r[PAYME_COLUMNS.cardNumber] ?? "").trim()
 
-    const category_id = resolveCategory(
+    const resolved = await resolveCategory({
+      userId: user.id,
       merchant,
       paymeCategory,
+      amount,
       categoryMapping,
       defaultCategoryId,
-      appCategories as { id: string; label: string }[]
-    )
+      appCategories,
+      supabase,
+    })
     const external_id = hashExternalId(dateStr, time, amount, merchant, card, type)
 
-    rows.push({ merchant, amount, date: dateStr, note, category_id, external_id })
+    rows.push({ merchant, amount, date: dateStr, note, category_id: resolved.category_id, external_id })
   }
 
   let inserted = 0

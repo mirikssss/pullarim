@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
+import { createClient } from "@/lib/supabase/server"
 import { getAuthUser, unauthorized } from "@/lib/api-auth"
 import { validationErrorResponse } from "@/lib/api-validation"
+import { resolveCategory } from "@/lib/payme-category-mapper"
 import * as XLSX from "xlsx"
 import { createHash } from "crypto"
 
@@ -28,6 +30,8 @@ export type PaymePreviewRow = {
   merchant: string
   amount: number
   paymeCategory: string
+  resolvedCategory: string
+  resolvedSource: "memory" | "mapping" | "rule" | "ai" | "default"
   note: string
   external_id: string
   raw: Record<string, unknown>
@@ -61,6 +65,16 @@ export async function POST(request: NextRequest) {
 
   const formData = await request.formData()
   const file = formData.get("file") as File | null
+  const defaultCategoryId = (formData.get("default_category_id") as string | null)?.trim() || null
+  let categoryMapping: Record<string, string> = {}
+  const mappingJson = formData.get("category_mapping") as string | null
+  if (mappingJson) {
+    try {
+      categoryMapping = JSON.parse(mappingJson) as Record<string, string>
+    } catch {
+      // ignore
+    }
+  }
   if (!file || !(file instanceof Blob)) {
     return NextResponse.json(validationErrorResponse("file required"), { status: 400 })
   }
@@ -123,6 +137,22 @@ export async function POST(request: NextRequest) {
 
   const importOnlySpisanie = formData.get("importOnlySpisanie") !== "false"
 
+  const supabase = await createClient()
+  const { data: defaultCats = [] } = await supabase
+    .from("categories")
+    .select("id, label")
+    .eq("is_default", true)
+    .is("user_id", null)
+  const { data: userCats = [] } = await supabase
+    .from("categories")
+    .select("id, label")
+    .eq("user_id", user.id)
+  const appCategories = [...(defaultCats ?? []), ...(userCats ?? [])] as { id: string; label: string }[]
+  const fallbackDefault = appCategories[0]?.id ?? "other"
+  const effectiveDefault = defaultCategoryId && appCategories.some((c) => c.id === defaultCategoryId)
+    ? defaultCategoryId
+    : fallbackDefault
+
   const rows: PaymePreviewRow[] = []
   for (let i = 0; i < rawRows.length; i++) {
     const raw = rawRows[i] as Record<string, unknown>
@@ -146,7 +176,20 @@ export async function POST(request: NextRequest) {
     const note = [comment, requisites].filter(Boolean).join(" ").slice(0, 500)
     const card = String(raw[PAYME_COLUMNS.cardNumber] ?? "").trim()
 
+    const resolved = await resolveCategory({
+      userId: user.id,
+      merchant,
+      paymeCategory,
+      amount,
+      categoryMapping,
+      defaultCategoryId: effectiveDefault,
+      appCategories,
+      supabase,
+    })
+
     const external_id = hashExternalId(dateStr, time, amount, merchant, card, type)
+
+    const catLabel = appCategories.find((c) => c.id === resolved.category_id)?.label ?? resolved.category_id
 
     rows.push({
       date: dateStr,
@@ -155,6 +198,8 @@ export async function POST(request: NextRequest) {
       merchant,
       amount,
       paymeCategory,
+      resolvedCategory: catLabel,
+      resolvedSource: resolved.source,
       note,
       external_id,
       raw: raw as Record<string, unknown>,

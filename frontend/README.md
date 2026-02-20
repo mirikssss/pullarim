@@ -39,6 +39,8 @@ Pullarim -- мобильное веб-приложение для трекинг
 5. Выполните `scripts/004-add-external-source-expenses.sql` (external_source, external_id для импорта Payme).
 6. Выполните `scripts/005-salary-modes-partial-unique.sql` (частичный уникальный индекс для активных режимов).
 7. Выполните `scripts/006-add-communication-cash-categories.sql` (категории Связь, Наличка).
+8. Выполните `scripts/007-assistant-storage.sql` (bucket `assistant_uploads` для AI-ассистента).
+9. Выполните `scripts/008-assistant-messages.sql` (таблица истории чата).
 
 ### 3. Переменные окружения
 
@@ -47,9 +49,10 @@ Pullarim -- мобильное веб-приложение для трекинг
 ```
 NEXT_PUBLIC_SUPABASE_URL=https://xxxxx.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+OPENROUTER_API_KEY=sk-or-...   # для AI-ассистента (/app/assistant)
 ```
 
-> **Важно:** Без этих переменных приложение не запустится. Для локальной сборки можно временно использовать placeholder-значения.
+> **Важно:** Без Supabase переменных приложение не запустится. `OPENROUTER_API_KEY` нужен для работы ассистента (чат, OCR-парсинг).
 
 ### 4. Запуск
 
@@ -151,9 +154,10 @@ lib/
 
 ### 6. Assistant (`/app/assistant`)
 - Chat interface with user/assistant bubbles
-- Tool cards (expense_added, query_result)
-- Suggestion chips
-- **Backend hookup:** AI SDK streaming + tool calling
+- OpenRouter (primary: gpt-oss-120b, fallback: qwen3-next-80b)
+- Tools: get_spending_summary, list_expenses, create_expense, get_salary_next_payout, resolve_category
+- Image attach: compress → upload → OCR (Tesseract) → LLM parse → preview cards → commit
+- Suggestion chips, mobile-first
 
 ### 7. Settings (`/app/settings`)
 - Profile card (avatar initials + name + email)
@@ -331,6 +335,12 @@ app/
 
 ### Реализованные API Routes
 
+- `GET /api/assistant/history` — история чата (последние 20 сообщений)
+- `POST /api/assistant/message` — AI-чат с tool calling (расходы, зарплата)
+- `POST /api/assistant/upload-image` — загрузка изображения в Storage
+- `POST /api/assistant/ocr-preview` — OCR (Tesseract) по изображению
+- `POST /api/assistant/ocr-parse` — LLM-парсинг OCR в список расходов
+- `POST /api/assistant/ocr-commit` — сохранение распознанных расходов в БД
 - `GET/PATCH /api/profile` — профиль пользователя
 - `GET/POST /api/categories` — категории (дефолтные + пользовательские)
 - `GET/POST /api/expenses` — расходы (фильтры: range, category_id, search, date_from, date_to)
