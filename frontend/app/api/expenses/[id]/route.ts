@@ -31,7 +31,7 @@ export async function PATCH(
       { status: 400 }
     )
   }
-  const { merchant, category_id, amount, date, note } = parsed.data
+  const { merchant, category_id, amount, date, note, exclude_from_budget } = parsed.data
 
   const supabase = await createClient()
   if (category_id !== undefined) {
@@ -62,6 +62,7 @@ export async function PATCH(
   if (amount !== undefined) updates.amount = amount
   if (date !== undefined) updates.date = date
   if (note !== undefined) updates.note = note
+  if (exclude_from_budget !== undefined) updates.exclude_from_budget = exclude_from_budget
 
   const { data, error } = await supabase
     .from("expenses")
@@ -78,12 +79,15 @@ export async function PATCH(
     return NextResponse.json({ error: "Not found" }, { status: 404 })
   }
 
-  // Learning loop: when user edits category, save to merchant memory (confidence=1.0)
-  if (category_id !== undefined && data.merchant) {
-    const m = normalizeMerchant((merchant ?? currentMerchant ?? data.merchant) as string)
-    if (m) {
-      await upsertMerchantMemory(supabase, user.id, m, category_id, -1)
-    }
+  // Learning loop: when user edits category or exclude_from_budget, save to merchant memory
+  const finalMerchant = (merchant ?? currentMerchant ?? data.merchant) as string
+  const finalCategoryId = category_id ?? data.category_id
+  const m = normalizeMerchant(finalMerchant)
+  if (m && (category_id !== undefined || exclude_from_budget !== undefined)) {
+    const includeOverride = exclude_from_budget !== undefined
+      ? !exclude_from_budget
+      : undefined
+    await upsertMerchantMemory(supabase, user.id, m, finalCategoryId, -1, includeOverride)
   }
 
   return NextResponse.json(data)

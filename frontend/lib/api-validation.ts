@@ -45,6 +45,7 @@ export const expensesGetQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).optional().default(0),
   date_from: dateStr.optional(),
   date_to: dateStr.optional(),
+  includeExcluded: z.coerce.number().optional(),
 })
 
 export const expensesPostBodySchema = z.object({
@@ -61,6 +62,7 @@ export const expensesPatchBodySchema = z.object({
   amount: z.number().int().positive().optional(),
   date: dateStr.optional(),
   note: z.string().max(500).nullable().optional(),
+  exclude_from_budget: z.boolean().optional(),
 }).refine((data) => Object.keys(data).some((k) => data[k as keyof typeof data] !== undefined), {
   message: "No fields to update",
 })
@@ -164,6 +166,7 @@ export const exportQuerySchema = z.object({
   to: dateStr.optional(),
   category_id: z.string().optional(),
   q: z.string().optional(),
+  includeExcluded: z.coerce.number().optional(),
 })
 
 // --- Import Payme ---

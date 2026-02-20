@@ -125,7 +125,7 @@ export default function ExpensesPage() {
     }
   }, [expenses, selectedIds.size])
 
-  const handleSaveEdit = useCallback(async (payload: { merchant: string; category_id: string; amount: number; date: string; note: string | null }) => {
+  const handleSaveEdit = useCallback(async (payload: { merchant: string; category_id: string; amount: number; date: string; note: string | null; exclude_from_budget?: boolean }) => {
     if (!editExpense) return
     setSaving(true)
     try {
@@ -814,7 +814,7 @@ function ExpenseEditDialog({
   expense: Expense | null
   categories: Category[]
   onClose: () => void
-  onSave: (p: { merchant: string; category_id: string; amount: number; date: string; note: string | null }) => void
+  onSave: (p: { merchant: string; category_id: string; amount: number; date: string; note: string | null; exclude_from_budget?: boolean }) => void
   saving: boolean
 }) {
   const [merchant, setMerchant] = useState("")
@@ -822,6 +822,7 @@ function ExpenseEditDialog({
   const [amount, setAmount] = useState("")
   const [date, setDate] = useState("")
   const [note, setNote] = useState("")
+  const [includeInBudget, setIncludeInBudget] = useState(true)
   const [confirmOpen, setConfirmOpen] = useState(false)
 
   const open = !!expense
@@ -832,12 +833,14 @@ function ExpenseEditDialog({
       setAmount(String(expense.amount))
       setDate(expense.date)
       setNote(expense.note ?? "")
+      setIncludeInBudget(!expense.exclude_from_budget)
     } else {
       setMerchant("")
       setCategoryId("")
       setAmount("")
       setDate("")
       setNote("")
+      setIncludeInBudget(true)
     }
   }, [expense])
 
@@ -847,6 +850,7 @@ function ExpenseEditDialog({
     setAmount("")
     setDate("")
     setNote("")
+    setIncludeInBudget(true)
     setConfirmOpen(false)
   }
 
@@ -872,6 +876,7 @@ function ExpenseEditDialog({
       amount: amt,
       date: date || new Date().toISOString().slice(0, 10),
       note: note.trim() || null,
+      exclude_from_budget: !includeInBudget,
     })
     reset()
     onClose()
@@ -894,6 +899,18 @@ function ExpenseEditDialog({
                 className="bg-secondary border-border"
                 required
               />
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <Label className="text-sm text-muted-foreground">Учитывать в бюджете</Label>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={includeInBudget}
+                onClick={() => setIncludeInBudget((v) => !v)}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${includeInBudget ? "bg-primary" : "bg-muted"}`}
+              >
+                <span className={`pointer-events-none block h-5 w-5 rounded-full bg-background shadow ring-0 transition-transform ${includeInBudget ? "translate-x-5" : "translate-x-1"}`} />
+              </button>
             </div>
             <div className="flex flex-col gap-2">
               <Label className="text-sm text-muted-foreground">Категория</Label>

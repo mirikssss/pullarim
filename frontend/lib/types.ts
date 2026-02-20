@@ -16,6 +16,8 @@ export interface Expense {
   amount: number
   date: string
   note?: string | null
+  exclude_from_budget?: boolean
+  source_type?: string | null
   created_at?: string
 }
 

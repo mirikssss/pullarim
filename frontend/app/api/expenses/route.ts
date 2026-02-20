@@ -40,6 +40,7 @@ export async function GET(request: NextRequest) {
     offset: searchParams.get("offset") ?? "0",
     date_from: searchParams.get("date_from") ?? undefined,
     date_to: searchParams.get("date_to") ?? undefined,
+    includeExcluded: searchParams.get("includeExcluded") ?? undefined,
   })
   if (!parsed.success) {
     return NextResponse.json(
@@ -47,7 +48,7 @@ export async function GET(request: NextRequest) {
       { status: 400 }
     )
   }
-  const { range, category_id, search, limit, offset, date_from, date_to } = parsed.data
+  const { range, category_id, search, limit, offset, date_from, date_to, includeExcluded } = parsed.data
 
   const { date_from: df, date_to: dt } = date_from && date_to
     ? { date_from, date_to }
@@ -63,6 +64,7 @@ export async function GET(request: NextRequest) {
     .order("date", { ascending: false })
     .range(offset, offset + limit - 1)
 
+  if (includeExcluded !== 1) query = query.eq("exclude_from_budget", false)
   if (category_id) query = query.eq("category_id", category_id)
   if (search) {
     query = query.or(`merchant.ilike.%${search}%,note.ilike.%${search}%`)
@@ -113,6 +115,8 @@ export async function POST(request: NextRequest) {
       amount,
       date,
       note: note ?? null,
+      exclude_from_budget: false,
+      source_type: "manual",
     })
     .select("*, category:categories(id, label, color)")
     .single()

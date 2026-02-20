@@ -204,6 +204,7 @@ export async function runTool(name: string, args: Record<string, unknown>): Prom
         .from("expenses")
         .select("amount")
         .eq("user_id", user.id)
+        .eq("exclude_from_budget", false)
         .gte("date", date_from)
         .lte("date", date_to)
 
@@ -249,6 +250,7 @@ export async function runTool(name: string, args: Record<string, unknown>): Prom
         .from("expenses")
         .select("amount, merchant, category:categories(id, label)")
         .eq("user_id", user.id)
+        .eq("exclude_from_budget", false)
         .gte("date", date_from)
         .lte("date", date_to)
 
@@ -317,6 +319,7 @@ export async function runTool(name: string, args: Record<string, unknown>): Prom
         .from("expenses")
         .select("id, date, amount, merchant, note, category:categories(id, label, color)")
         .eq("user_id", user.id)
+        .eq("exclude_from_budget", false)
         .gte("date", from)
         .lte("date", to)
         .order("date", { ascending: false })

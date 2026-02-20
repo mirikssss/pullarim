@@ -19,8 +19,9 @@ type PaymePreviewRow = {
   merchant: string
   amount: number
   paymeCategory?: string
-  resolvedCategory?: string
-  resolvedSource?: "memory" | "mapping" | "rule" | "ai" | "default"
+  suggestedCategory?: string
+  resolvedSource?: "transfer" | "memory" | "mapping" | "seed" | "rule" | "ai" | "default"
+  exclude_from_budget?: boolean
   note?: string
   external_id?: string
 }
@@ -43,6 +44,7 @@ export default function ImportPage() {
   const [error, setError] = useState<string | null>(null)
   const [reprocessLoading, setReprocessLoading] = useState(false)
   const [reprocessResult, setReprocessResult] = useState<{ total_in_other: number; updated: number } | null>(null)
+  const [seedLoading, setSeedLoading] = useState(false)
 
   const { data: categories = [] } = useSWR<Category[]>(categoriesKey(), fetcher)
 
@@ -121,6 +123,20 @@ export default function ImportPage() {
       setLoading(false)
     }
   }, [file, defaultCategoryId, importOnlySpisanie])
+
+  const handleSeed = useCallback(async () => {
+    setSeedLoading(true)
+    setError(null)
+    try {
+      const res = await fetch("/api/merchant-map/seed", { method: "POST" })
+      if (!res.ok) throw new Error("Ошибка применения базы")
+      setError(null)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Ошибка")
+    } finally {
+      setSeedLoading(false)
+    }
+  }, [])
 
   const handleReprocess = useCallback(async () => {
     setReprocessLoading(true)
@@ -234,6 +250,7 @@ export default function ImportPage() {
                   <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Payme</th>
                   <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">→ Категория</th>
                   <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">Источник</th>
+                  <th className="text-left px-3 py-2 text-xs font-medium text-muted-foreground">В бюджет</th>
                   <th className="text-right px-3 py-2 text-xs font-medium text-muted-foreground">Сумма</th>
                 </tr>
               </thead>
@@ -243,16 +260,19 @@ export default function ImportPage() {
                     <td className="px-3 py-2 text-muted-foreground">{r.date}</td>
                     <td className="px-3 py-2 truncate max-w-[120px]">{r.merchant}</td>
                     <td className="px-3 py-2 text-muted-foreground text-xs truncate max-w-[70px]">{r.paymeCategory || "—"}</td>
-                    <td className="px-3 py-2 text-xs font-medium">{r.resolvedCategory || "—"}</td>
+                    <td className="px-3 py-2 text-xs font-medium">{r.suggestedCategory || "—"}</td>
                     <td className="px-3 py-2 text-xs text-muted-foreground">
-                      <span title={r.resolvedSource} className="capitalize">{r.resolvedSource === "memory" && "память"}
+                      <span title={r.resolvedSource}>{r.resolvedSource === "transfer" && "перевод"}
+                        {r.resolvedSource === "memory" && "память"}
                         {r.resolvedSource === "mapping" && "маппинг"}
+                        {r.resolvedSource === "seed" && "seed"}
                         {r.resolvedSource === "rule" && "правило"}
                         {r.resolvedSource === "ai" && "AI"}
                         {r.resolvedSource === "default" && "по умолч."}
                         {!r.resolvedSource && "—"}
                       </span>
                     </td>
+                    <td className="px-3 py-2 text-xs">{r.exclude_from_budget ? "Нет" : "Да"}</td>
                     <td className="px-3 py-2 text-right font-medium">{formatUZS(r.amount)}</td>
                   </tr>
                 ))}
@@ -320,6 +340,15 @@ export default function ImportPage() {
         <div className="flex items-center justify-between px-4 h-14">
           <h1 className="text-lg font-semibold text-foreground">Импорт Payme</h1>
           <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleSeed}
+              disabled={seedLoading}
+            >
+              {seedLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+              Применить UZ seed
+            </Button>
             <Button
               variant="outline"
               size="sm"

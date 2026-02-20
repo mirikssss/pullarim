@@ -124,7 +124,7 @@ export async function POST(request: NextRequest) {
     .eq("user_id", user.id)
   const appCategories = [...(defaultCats ?? []), ...(userCats ?? [])] as { id: string; label: string }[]
 
-  const rows: { merchant: string; amount: number; date: string; note: string; category_id: string; external_id: string }[] = []
+  const rows: { merchant: string; amount: number; date: string; note: string; category_id: string; external_id: string; exclude_from_budget: boolean; source_type: string }[] = []
   for (const raw of rawRows) {
     const r = raw as Record<string, unknown>
     const type = String(r[PAYME_COLUMNS.type] ?? "").trim()
@@ -159,7 +159,16 @@ export async function POST(request: NextRequest) {
     })
     const external_id = hashExternalId(dateStr, time, amount, merchant, card, type)
 
-    rows.push({ merchant, amount, date: dateStr, note, category_id: resolved.category_id, external_id })
+    rows.push({
+      merchant,
+      amount,
+      date: dateStr,
+      note,
+      category_id: resolved.category_id,
+      external_id,
+      exclude_from_budget: resolved.exclude_from_budget,
+      source_type: resolved.source_type,
+    })
   }
 
   let inserted = 0
@@ -182,6 +191,8 @@ export async function POST(request: NextRequest) {
       note: row.note || null,
       external_source: "payme",
       external_id: row.external_id,
+      exclude_from_budget: row.exclude_from_budget,
+      source_type: row.source_type,
     })
 
     if (error) {

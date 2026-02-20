@@ -30,8 +30,9 @@ export type PaymePreviewRow = {
   merchant: string
   amount: number
   paymeCategory: string
-  resolvedCategory: string
-  resolvedSource: "memory" | "mapping" | "rule" | "ai" | "default"
+  suggestedCategory: string
+  resolvedSource: "transfer" | "memory" | "mapping" | "seed" | "rule" | "ai" | "default"
+  exclude_from_budget: boolean
   note: string
   external_id: string
   raw: Record<string, unknown>
@@ -198,8 +199,9 @@ export async function POST(request: NextRequest) {
       merchant,
       amount,
       paymeCategory,
-      resolvedCategory: catLabel,
+      suggestedCategory: catLabel,
       resolvedSource: resolved.source,
+      exclude_from_budget: resolved.exclude_from_budget,
       note,
       external_id,
       raw: raw as Record<string, unknown>,

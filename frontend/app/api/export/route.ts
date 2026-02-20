@@ -19,6 +19,7 @@ export async function GET(request: NextRequest) {
     to: searchParams.get("to") ?? undefined,
     category_id: searchParams.get("category_id") ?? undefined,
     q: searchParams.get("q") ?? undefined,
+    includeExcluded: searchParams.get("includeExcluded") ?? undefined,
   })
   if (!parsed.success) {
     return NextResponse.json(
@@ -26,7 +27,7 @@ export async function GET(request: NextRequest) {
       { status: 400 }
     )
   }
-  const { format, from, to, category_id, q } = parsed.data
+  const { format, from, to, category_id, q, includeExcluded } = parsed.data
 
   const supabase = await createClient()
   let query = supabase
@@ -35,6 +36,7 @@ export async function GET(request: NextRequest) {
     .eq("user_id", user.id)
     .order("date", { ascending: false })
 
+  if (includeExcluded !== 1) query = query.eq("exclude_from_budget", false)
   if (from) query = query.gte("date", from)
   if (to) query = query.lte("date", to)
   if (category_id) query = query.eq("category_id", category_id)
