@@ -46,6 +46,8 @@ export default function SettingsPage() {
   const [editName, setEditName] = useState("")
   const [saving, setSaving] = useState(false)
   const [exporting, setExporting] = useState(false)
+  const [deletingExpenses, setDeletingExpenses] = useState(false)
+  const [deleteAllDialogOpen, setDeleteAllDialogOpen] = useState(false)
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -94,12 +96,28 @@ export default function SettingsPage() {
     }
   }
 
+  const handleDeleteAllExpenses = async () => {
+    setDeletingExpenses(true)
+    try {
+      const res = await fetch("/api/expenses/dev/delete-all", { method: "DELETE" })
+      if (!res.ok) throw new Error(await res.text())
+      setDeleteAllDialogOpen(false)
+      router.refresh()
+      window.location.reload()
+    } catch {
+      // TODO: toast
+    } finally {
+      setDeletingExpenses(false)
+    }
+  }
+
+  const isDev = process.env.NODE_ENV === "development"
   const fullName = profile?.full_name ?? "Пользователь"
   const initials = fullName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()
   const email = (profile as { email?: string })?.email ?? ""
 
   return (
-    <div className="max-w-2xl mx-auto">
+    <div className="max-w-4xl mx-auto">
       {/* Header */}
       <div className="sticky top-0 z-30 bg-background/80 backdrop-blur-lg border-b border-border">
         <div className="flex items-center px-4 h-14">
@@ -178,6 +196,40 @@ export default function SettingsPage() {
             </div>
             <ChevronRight className="w-4 h-4 text-muted-foreground" />
           </button>
+
+          {isDev && (
+            <AlertDialog open={deleteAllDialogOpen} onOpenChange={setDeleteAllDialogOpen}>
+              <AlertDialogTrigger asChild>
+                <button className="flex items-center gap-3 w-full px-4 py-3.5 border-b border-border hover:bg-destructive/5 transition-colors text-left">
+                  <div className="w-8 h-8 rounded-lg bg-destructive/10 flex items-center justify-center">
+                    <Trash2 className="w-4 h-4 text-destructive" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm text-destructive">Удалить все расходы</p>
+                    <p className="text-xs text-muted-foreground">Только для разработки</p>
+                  </div>
+                </button>
+              </AlertDialogTrigger>
+              <AlertDialogContent className="bg-card border-border max-w-sm">
+                <AlertDialogHeader>
+                  <AlertDialogTitle className="text-foreground">Удалить все расходы?</AlertDialogTitle>
+                  <AlertDialogDescription className="text-muted-foreground">
+                    Все расходы будут удалены без возможности восстановления.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel className="border-border text-foreground" disabled={deletingExpenses}>Отмена</AlertDialogCancel>
+                  <Button
+                    variant="destructive"
+                    onClick={handleDeleteAllExpenses}
+                    disabled={deletingExpenses}
+                  >
+                    {deletingExpenses ? <Loader2 className="w-4 h-4 animate-spin" /> : "Удалить"}
+                  </Button>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
 
           <AlertDialog>
             <AlertDialogTrigger asChild>

@@ -38,6 +38,7 @@ Pullarim -- мобильное веб-приложение для трекинг
 4. Выполните `scripts/003-add-end-date.sql` (поле end_date для режимов зарплаты).
 5. Выполните `scripts/004-add-external-source-expenses.sql` (external_source, external_id для импорта Payme).
 6. Выполните `scripts/005-salary-modes-partial-unique.sql` (частичный уникальный индекс для активных режимов).
+7. Выполните `scripts/006-add-communication-cash-categories.sql` (категории Связь, Наличка).
 
 ### 3. Переменные окружения
 

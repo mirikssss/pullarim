@@ -163,11 +163,13 @@ export async function POST(request: NextRequest) {
 
   const previewRows = rows.slice(0, 30)
   const totalSpend = rows.reduce((s, r) => s + r.amount, 0)
+  const uniquePaymeCategories = [...new Set(rows.map((r) => r.paymeCategory).filter(Boolean))].sort()
 
   return NextResponse.json({
     rows: previewRows,
     total: rows.length,
     totalSpend,
+    uniquePaymeCategories,
     columns: Object.values(PAYME_COLUMNS),
   })
 }

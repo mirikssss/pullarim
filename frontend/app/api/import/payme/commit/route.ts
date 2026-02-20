@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { getAuthUser, unauthorized } from "@/lib/api-auth"
 import { validationErrorResponse, categoryExists } from "@/lib/api-validation"
+import { resolveCategory } from "@/lib/payme-category-mapper"
 import * as XLSX from "xlsx"
 import { createHash } from "crypto"
 
@@ -112,6 +113,17 @@ export async function POST(request: NextRequest) {
     )
   }
 
+  const { data: defaultCats = [] } = await supabase
+    .from("categories")
+    .select("id, label")
+    .eq("is_default", true)
+    .is("user_id", null)
+  const { data: userCats = [] } = await supabase
+    .from("categories")
+    .select("id, label")
+    .eq("user_id", user.id)
+  const appCategories = [...(defaultCats ?? []), ...(userCats ?? [])]
+
   const rows: { merchant: string; amount: number; date: string; note: string; category_id: string; external_id: string }[] = []
   for (const raw of rawRows) {
     const r = raw as Record<string, unknown>
@@ -135,7 +147,13 @@ export async function POST(request: NextRequest) {
     const note = [comment, requisites].filter(Boolean).join(" ").slice(0, 500)
     const card = String(r[PAYME_COLUMNS.cardNumber] ?? "").trim()
 
-    const category_id = (paymeCategory && categoryMapping[paymeCategory]) || defaultCategoryId
+    const category_id = resolveCategory(
+      merchant,
+      paymeCategory,
+      categoryMapping,
+      defaultCategoryId,
+      appCategories as { id: string; label: string }[]
+    )
     const external_id = hashExternalId(dateStr, time, amount, merchant, card, type)
 
     rows.push({ merchant, amount, date: dateStr, note, category_id, external_id })

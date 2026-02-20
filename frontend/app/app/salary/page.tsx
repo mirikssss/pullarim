@@ -297,7 +297,7 @@ export default function SalaryPage() {
   const cardShadow = "shadow-[var(--shadow-card)]"
 
   return (
-    <div className="max-w-2xl mx-auto">
+    <div className="max-w-4xl mx-auto">
       {/* Header with month navigation */}
       <div className="sticky top-0 z-30 bg-background/80 backdrop-blur-lg border-b border-border">
         <div className="flex items-center justify-between px-4 h-14">

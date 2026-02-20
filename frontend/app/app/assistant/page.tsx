@@ -45,7 +45,7 @@ export default function AssistantPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto flex flex-col h-[calc(100dvh-4rem)] md:h-dvh">
+    <div className="max-w-4xl mx-auto flex flex-col h-[calc(100dvh-4rem)] md:h-dvh">
       {/* Header */}
       <div className="sticky top-0 z-30 bg-background/80 backdrop-blur-lg border-b border-border">
         <div className="flex items-center gap-3 px-4 h-14">
