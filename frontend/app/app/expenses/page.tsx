@@ -93,6 +93,7 @@ export default function ExpensesPage() {
   const [categoryFilter, setCategoryFilter] = useState("all")
   const [range, setRange] = useState<QuickRange>("month")
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [selectionMode, setSelectionMode] = useState(false)
   const [editExpense, setEditExpense] = useState<Expense | null>(null)
   const [detailExpense, setDetailExpense] = useState<Expense | null>(null)
   const [deleteExpense, setDeleteExpense] = useState<Expense | null>(null)
@@ -105,7 +106,7 @@ export default function ExpensesPage() {
   const { data: categories = [] } = useSWR<Category[]>(categoriesKey(), fetcher)
 
   const periodTotal = expenses.reduce((s, e) => s + e.amount, 0)
-  const isSelectionMode = selectedIds.size > 0
+  const isSelectionMode = selectionMode
 
   const toggleSelect = useCallback((id: string) => {
     setSelectedIds((prev) => {
@@ -169,6 +170,7 @@ export default function ExpensesPage() {
       })
       if (!res.ok) throw new Error(await res.text())
       setSelectedIds(new Set())
+      setSelectionMode(false)
       setBulkDeleteOpen(false)
       mutate()
     } catch {
@@ -225,7 +227,7 @@ export default function ExpensesPage() {
       </div>
 
       {/* Content */}
-      <div className="p-4 flex flex-col gap-4">
+      <div className="p-3 sm:p-4 flex flex-col gap-4">
         {/* Quick Range Filters */}
         <div className="flex gap-1 p-1 rounded-lg bg-secondary">
           {RANGES.map((r) => (
@@ -248,14 +250,25 @@ export default function ExpensesPage() {
           ))}
         </div>
 
-        {/* Period Total */}
-        <div className="flex items-center justify-between">
+        {/* Period Total — mobile: stack, desktop: row */}
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
             <p className="text-xs text-muted-foreground">Итого за период</p>
             <p className="text-xl font-bold text-foreground">{formatUZS(periodTotal)}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{expenses.length} расходов</p>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">{expenses.length} расходов</span>
+          <div className="flex items-center gap-2 flex-wrap">
+            {!selectionMode ? (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setSelectionMode(true)}
+                className="h-8 border-border"
+              >
+                <CheckSquare className="w-3.5 h-3.5 mr-1.5" />
+                Выбрать
+              </Button>
+            ) : null}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button size="sm" variant="outline" className="h-8 border-border gap-1.5">
@@ -370,7 +383,10 @@ export default function ExpensesPage() {
               <Button
                 size="sm"
                 variant="ghost"
-                onClick={() => setSelectedIds(new Set())}
+                onClick={() => {
+                  setSelectedIds(new Set())
+                  setSelectionMode(false)
+                }}
                 className="h-8"
               >
                 Отмена
@@ -401,6 +417,7 @@ export default function ExpensesPage() {
                   onEdit={() => setEditExpense(expense)}
                   onDelete={() => setDeleteExpense(expense)}
                   showActions
+                  showCheckbox={selectionMode}
                 />
               ))}
               {expenses.length === 0 && (
@@ -412,40 +429,108 @@ export default function ExpensesPage() {
               key="table"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="rounded-xl border border-border bg-card overflow-hidden"
+              className="rounded-xl border border-border bg-card overflow-hidden w-full"
             >
-              <div className="overflow-x-auto max-w-full">
-                <table className="w-full text-sm min-w-0">
+              {/* Mobile: list with grid (no table) */}
+              <ul className="md:hidden divide-y divide-border">
+                {groupExpensesByDate(expenses).map((group) => (
+                  <Fragment key={group.date}>
+                    <li className="px-4 py-2 bg-secondary/30 text-xs font-medium text-muted-foreground flex justify-between items-center">
+                      <span>{formatDateLabel(group.date)}</span>
+                      <span>{formatUZS(group.dayTotal)}</span>
+                    </li>
+                    {group.items.map((expense) => (
+                      <li
+                        key={expense.id}
+                        className={`grid gap-2 px-4 py-3 hover:bg-secondary/50 transition-colors cursor-pointer items-start ${selectionMode ? "grid-cols-[auto_1fr_auto]" : "grid-cols-[1fr_auto]"}`}
+                        style={{ gridTemplateColumns: selectionMode ? "auto 1fr auto" : "1fr auto" }}
+                        onClick={() => setDetailExpense(expense)}
+                      >
+                        {selectionMode && (
+                          <div className="pt-0.5" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              onClick={() => toggleSelect(expense.id)}
+                              className="text-muted-foreground hover:text-foreground"
+                            >
+                              {selectedIds.has(expense.id) ? (
+                                <CheckSquare className="w-5 h-5 text-primary" />
+                              ) : (
+                                <Square className="w-5 h-5" />
+                              )}
+                            </button>
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-foreground line-clamp-1">{expense.merchant}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {getCategoryLabel(categories, expense.category_id)} · {new Date(expense.date).toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}
+                          </p>
+                        </div>
+                        <div className="flex flex-col items-end gap-1">
+                          <span className="text-sm font-semibold text-foreground whitespace-nowrap">{formatUZS(expense.amount)}</span>
+                          <div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              onClick={() => setEditExpense(expense)}
+                              className="min-w-[36px] min-h-[36px] flex items-center justify-center rounded-lg hover:bg-secondary active:bg-secondary/80 text-muted-foreground hover:text-foreground transition-colors"
+                              aria-label="Редактировать"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => setDeleteExpense(expense)}
+                              className="min-w-[36px] min-h-[36px] flex items-center justify-center rounded-lg hover:bg-destructive/10 active:bg-destructive/20 text-muted-foreground hover:text-destructive transition-colors"
+                              aria-label="Удалить"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      </li>
+                    ))}
+                  </Fragment>
+                ))}
+                {expenses.length === 0 && (
+                  <li className="py-8 text-center text-sm text-muted-foreground">
+                    Нет расходов за выбранный период
+                  </li>
+                )}
+              </ul>
+
+              {/* Desktop: table */}
+              <div className="hidden md:block overflow-x-auto w-full">
+                <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-border">
-                      <th className="w-10 px-2 py-3 text-center shrink-0">
-                        <button
-                          onClick={toggleSelectAll}
-                          className="text-muted-foreground hover:text-foreground"
-                          aria-label="Выбрать все"
-                        >
-                          {selectedIds.size === expenses.length && expenses.length > 0 ? (
-                            <CheckSquare className="w-4 h-4 text-primary mx-auto" />
-                          ) : (
-                            <Square className="w-4 h-4 mx-auto" />
-                          )}
-                        </button>
-                      </th>
-                      <th className="text-left px-3 md:px-4 py-3 text-xs font-medium text-muted-foreground">Название</th>
-                      <th className="text-left px-2 py-3 text-xs font-medium text-muted-foreground hidden md:table-cell">Категория</th>
-                      <th className="text-left px-2 py-3 text-xs font-medium text-muted-foreground hidden md:table-cell">Дата</th>
-                      <th className="text-right px-3 md:px-4 py-3 text-xs font-medium text-muted-foreground">Сумма</th>
-                      <th className="w-20 px-2 py-3 hidden md:table-cell" />
+                      {selectionMode && (
+                        <th className="w-10 px-2 py-3 text-center">
+                          <button
+                            onClick={toggleSelectAll}
+                            className="text-muted-foreground hover:text-foreground"
+                            aria-label="Выбрать все"
+                          >
+                            {selectedIds.size === expenses.length && expenses.length > 0 ? (
+                              <CheckSquare className="w-4 h-4 text-primary mx-auto" />
+                            ) : (
+                              <Square className="w-4 h-4 mx-auto" />
+                            )}
+                          </button>
+                        </th>
+                      )}
+                      <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Название</th>
+                      <th className="text-left px-2 py-3 text-xs font-medium text-muted-foreground">Категория</th>
+                      <th className="text-left px-2 py-3 text-xs font-medium text-muted-foreground">Дата</th>
+                      <th className="text-right px-4 py-3 text-xs font-medium text-muted-foreground">Сумма</th>
+                      <th className="w-20 px-2 py-3" />
                     </tr>
                   </thead>
                   <tbody>
                     {groupExpensesByDate(expenses).map((group) => (
                       <Fragment key={group.date}>
                         <tr className="border-t-2 border-border bg-secondary/30">
-                          <td colSpan={4} className="px-3 md:px-4 py-2 text-xs font-medium text-muted-foreground">
+                          <td colSpan={selectionMode ? 4 : 3} className="px-4 py-2 text-xs font-medium text-muted-foreground">
                             {formatDateLabel(group.date)}
                           </td>
-                          <td colSpan={2} className="px-3 md:px-4 py-2 text-right text-xs font-medium text-muted-foreground">
+                          <td colSpan={2} className="px-4 py-2 text-right text-xs font-medium text-muted-foreground">
                             {formatUZS(group.dayTotal)}
                           </td>
                         </tr>
@@ -455,30 +540,32 @@ export default function ExpensesPage() {
                             className="border-b border-border hover:bg-secondary/50 transition-colors cursor-pointer"
                             onClick={() => setDetailExpense(expense)}
                           >
-                            <td className="px-2 py-3 text-center shrink-0" onClick={(e) => e.stopPropagation()}>
-                              <button
-                                onClick={() => toggleSelect(expense.id)}
-                                className="text-muted-foreground hover:text-foreground"
-                              >
-                                {selectedIds.has(expense.id) ? (
-                                  <CheckSquare className="w-4 h-4 text-primary" />
-                                ) : (
-                                  <Square className="w-4 h-4" />
-                                )}
-                              </button>
-                            </td>
-                            <td className="px-3 md:px-4 py-3 text-foreground truncate max-w-[120px] md:max-w-none">{expense.merchant}</td>
-                            <td className="px-2 py-3 hidden md:table-cell">
+                            {selectionMode && (
+                              <td className="px-2 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                                <button
+                                  onClick={() => toggleSelect(expense.id)}
+                                  className="text-muted-foreground hover:text-foreground"
+                                >
+                                  {selectedIds.has(expense.id) ? (
+                                    <CheckSquare className="w-4 h-4 text-primary" />
+                                  ) : (
+                                    <Square className="w-4 h-4" />
+                                  )}
+                                </button>
+                              </td>
+                            )}
+                            <td className="px-4 py-3 text-foreground">{expense.merchant}</td>
+                            <td className="px-2 py-3">
                               <Badge variant="outline" className="text-[10px] border-border text-muted-foreground">
                                 {getCategoryLabel(categories, expense.category_id)}
                               </Badge>
                             </td>
-                            <td className="px-2 py-3 text-muted-foreground text-xs hidden md:table-cell">
+                            <td className="px-2 py-3 text-muted-foreground text-xs">
                               {new Date(expense.date).toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}
                             </td>
-                            <td className="px-3 md:px-4 py-3 text-right font-medium text-foreground shrink-0">{formatUZS(expense.amount)}</td>
-                            <td className="px-2 py-3 hidden md:table-cell" onClick={(e) => e.stopPropagation()}>
-                              <div className="flex items-center gap-0.5">
+                            <td className="px-4 py-3 text-right font-medium text-foreground">{formatUZS(expense.amount)}</td>
+                            <td className="px-2 py-3" onClick={(e) => e.stopPropagation()}>
+                              <div className="flex items-center justify-end gap-0.5">
                                 <button
                                   onClick={() => setEditExpense(expense)}
                                   className="p-1.5 rounded hover:bg-secondary text-muted-foreground hover:text-foreground"
@@ -501,7 +588,7 @@ export default function ExpensesPage() {
                     ))}
                     {expenses.length === 0 && (
                       <tr>
-                        <td colSpan={6} className="text-center py-8 text-sm text-muted-foreground">
+                        <td colSpan={selectionMode ? 6 : 5} className="text-center py-8 text-sm text-muted-foreground">
                           Нет расходов за выбранный период
                         </td>
                       </tr>
@@ -516,7 +603,7 @@ export default function ExpensesPage() {
 
       {/* Detail popup (mobile / row click) */}
       <Dialog open={!!detailExpense} onOpenChange={(o) => !o && setDetailExpense(null)}>
-        <DialogContent className="bg-card border-border max-w-sm">
+        <DialogContent className="bg-card border-border !max-w-[min(400px,calc(100vw-3rem))]">
           <DialogHeader>
             <DialogTitle className="text-foreground">Расход</DialogTitle>
           </DialogHeader>
@@ -651,6 +738,7 @@ function ExpenseCard({
   onEdit,
   onDelete,
   showActions,
+  showCheckbox,
 }: {
   expense: Expense
   categories: Category[]
@@ -661,6 +749,7 @@ function ExpenseCard({
   onEdit?: () => void
   onDelete?: () => void
   showActions?: boolean
+  showCheckbox?: boolean
 }) {
   return (
     <motion.div
@@ -669,7 +758,7 @@ function ExpenseCard({
         selected ? "ring-2 ring-primary/50 ring-inset" : ""
       }`}
     >
-      {showActions && onToggleSelect && (
+      {showCheckbox && onToggleSelect && (
         <button
           onClick={() => onToggleSelect(expense.id)}
           className="shrink-0 text-muted-foreground hover:text-foreground"
