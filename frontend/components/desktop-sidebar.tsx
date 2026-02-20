@@ -10,6 +10,7 @@ import {
   Receipt,
   MessageCircle,
   Settings,
+  FileUp,
 } from "lucide-react"
 import { motion } from "framer-motion"
 import { fetcher, profileKey } from "@/lib/api"
@@ -19,6 +20,7 @@ const NAV_ITEMS = [
   { href: "/app/salary", label: "Зарплата", icon: Banknote },
   { href: "/app/add", label: "Добавить", icon: PlusCircle },
   { href: "/app/expenses", label: "Расходы", icon: Receipt },
+  { href: "/app/import", label: "Импорт", icon: FileUp },
   { href: "/app/assistant", label: "Ассистент", icon: MessageCircle },
   { href: "/app/settings", label: "Настройки", icon: Settings },
 ]

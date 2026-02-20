@@ -36,6 +36,8 @@ Pullarim -- мобильное веб-приложение для трекинг
 2. Выполните `scripts/001-init.sql` (создание таблиц, индексов, RLS).
 3. Выполните `scripts/002-seed-categories.sql` (дефолтные категории).
 4. Выполните `scripts/003-add-end-date.sql` (поле end_date для режимов зарплаты).
+5. Выполните `scripts/004-add-external-source-expenses.sql` (external_source, external_id для импорта Payme).
+6. Выполните `scripts/005-salary-modes-partial-unique.sql` (частичный уникальный индекс для активных режимов).
 
 ### 3. Переменные окружения
 
@@ -194,42 +196,13 @@ Destructive:   oklch(0.55 0.2 25)     -- red
 
 ---
 
-## Data Model (Mock -> Real)
+## Data Model
 
-### Types defined in `lib/mock-data.ts`:
+### Types defined in `lib/types.ts`:
 
-```typescript
-interface Expense {
-  id: string
-  merchant: string
-  category: Category
-  amount: number          // in UZS (integer, no decimals)
-  date: string            // ISO date "YYYY-MM-DD"
-  note?: string
-}
+- `Expense`, `Category`, `SalaryMode`, `WorkException`, `Payment`, `Profile`, `SalaryForecast`, `ChatMessage`
 
-type Category = "food" | "transport" | "shopping" | "entertainment" | "bills" | "health" | "other"
-
-interface SalaryMode {
-  id: string
-  label: string           // "Full-time", "Part-time"
-  amount: number          // monthly net amount in UZS
-  startDate: string       // ISO date
-  active: boolean
-}
-
-interface ChatMessage {
-  id: string
-  role: "user" | "assistant"
-  content: string
-  toolCard?: {
-    type: "expense_added" | "query_result"
-    data: Record<string, string | number>
-  }
-}
-```
-
-### Utility functions:
+### Utility functions (lib/formatters.ts):
 - `formatUZS(amount)` -- "1 250 000 сум"
 - `formatUZSShort(amount)` -- "1.2М" / "85К"
 
@@ -359,12 +332,17 @@ app/
 
 - `GET/PATCH /api/profile` — профиль пользователя
 - `GET/POST /api/categories` — категории (дефолтные + пользовательские)
-- `GET/POST /api/expenses` — расходы (фильтры: range, category_id, search)
+- `GET/POST /api/expenses` — расходы (фильтры: range, category_id, search, date_from, date_to)
 - `PATCH/DELETE /api/expenses/[id]` — редактирование/удаление расхода
 - `GET/POST /api/salary/modes` — режимы зарплаты
 - `GET/POST/DELETE /api/salary/exceptions` — исключения рабочих дней
 - `GET /api/salary/forecast` — прогноз выплат за месяц
 - `GET/POST/PATCH /api/salary/payments` — история выплат
+- `GET /api/salary/income-summary` — сводка доходов (from, to)
+- `GET /api/export` — экспорт расходов (format: csv|xlsx, from, to, category_id, q)
+- `GET /api/export/expenses.xlsx` — экспорт расходов в XLSX (from, to, category_id, q)
+- `POST /api/import/payme/preview` — превью импорта из XLSX Payme
+- `POST /api/import/payme/commit` — импорт с дедупликацией
 
 ### State Management
 - **SWR** for all server data (expenses, salary, profile)

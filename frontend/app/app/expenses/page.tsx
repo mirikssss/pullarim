@@ -3,7 +3,7 @@
 import { useState } from "react"
 import useSWR from "swr"
 import { motion, AnimatePresence } from "framer-motion"
-import { LayoutGrid, List, ChevronDown, Plus, Search, X } from "lucide-react"
+import { LayoutGrid, List, ChevronDown, Plus, Search, X, Download, Upload } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -52,6 +52,21 @@ export default function ExpensesPage() {
   const { data: categories = [] } = useSWR<Category[]>(categoriesKey(), fetcher)
 
   const periodTotal = expenses.reduce((s, e) => s + e.amount, 0)
+
+  const handleExport = () => {
+    const now = new Date()
+    const today = now.toISOString().slice(0, 10)
+    let from = today
+    if (range === "7d") from = new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+    else if (range === "15d") from = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+    else if (range === "month") from = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`
+    const params = new URLSearchParams()
+    params.set("from", from)
+    params.set("to", today)
+    if (categoryFilter !== "all") params.set("category_id", categoryFilter)
+    if (searchQuery) params.set("q", searchQuery)
+    window.open(`/api/export/expenses.xlsx?${params.toString()}`, "_blank")
+  }
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -116,6 +131,16 @@ export default function ExpensesPage() {
           </div>
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground">{expenses.length} расходов</span>
+            <Button size="sm" variant="outline" className="h-8 border-border" onClick={handleExport}>
+              <Download className="w-3.5 h-3.5 mr-1.5" />
+              Экспорт
+            </Button>
+            <Link href="/app/import">
+              <Button size="sm" variant="outline" className="h-8 border-border">
+                <Upload className="w-3.5 h-3.5 mr-1.5" />
+                Импорт
+              </Button>
+            </Link>
             <Link href="/app/add">
               <Button size="sm" className="h-8 bg-primary text-primary-foreground hover:bg-primary/90">
                 <Plus className="w-3.5 h-3.5 mr-1.5" />

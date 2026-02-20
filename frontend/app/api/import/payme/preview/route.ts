@@ -2,59 +2,57 @@ import { NextRequest, NextResponse } from "next/server"
 import { getAuthUser, unauthorized } from "@/lib/api-auth"
 import { validationErrorResponse } from "@/lib/api-validation"
 import * as XLSX from "xlsx"
+import { createHash } from "crypto"
 
-/** Normalized row for preview */
+const PAYME_SHEET = "Filtered_Cheques"
+const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
+
+const PAYME_COLUMNS = {
+  date: "Дата платежа",
+  time: "Время платежа",
+  type: "Тип операции",
+  supplierName: "Имя поставщика",
+  orgName: "Название организации поставщика",
+  amount: "Сумма платежа",
+  category: "Категория",
+  comment: "Комментарий к платежу",
+  requisites: "Реквизиты платежа",
+  cardNumber: "Номер карты",
+  chequeState: "Состояние чека",
+} as const
+
 export type PaymePreviewRow = {
+  date: string
+  time: string
+  type: string
   merchant: string
   amount: number
-  date: string
-  note?: string
-  external_id?: string
+  paymeCategory: string
+  note: string
+  external_id: string
   raw: Record<string, unknown>
 }
 
-/** Common column name mappings for Payme-style exports */
-const COLUMN_ALIASES: Record<string, string[]> = {
-  merchant: ["merchant", "название", "описание", "description", "получатель", "recipient", "кард", "card", "магазин", "store"],
-  amount: ["amount", "сумма", "sum", "сумм", "amount_sum", "сумма операции"],
-  date: ["date", "дата", "create_time", "pay_time", "время", "time"],
-  note: ["note", "заметка", "comment", "описание", "description"],
-}
-
-function findColumn(row: Record<string, unknown>, aliases: string[]): string | null {
-  const keys = Object.keys(row).map((k) => k.toLowerCase().trim())
-  for (const alias of aliases) {
-    const found = keys.find((k) => k.includes(alias) || alias.includes(k))
-    if (found) {
-      const orig = Object.keys(row).find((k) => k.toLowerCase().trim() === found)
-      return orig ?? null
-    }
-  }
-  return null
+function ddMmYyyyToYyyyMmDd(val: string): string {
+  const m = val.match(/^(\d{1,2})[./\-](\d{1,2})[./\-](\d{4})$/)
+  if (!m) return ""
+  const [, d, mo, y] = m
+  return `${y}-${mo.padStart(2, "0")}-${d.padStart(2, "0")}`
 }
 
 function parseAmount(val: unknown): number {
-  if (typeof val === "number" && !Number.isNaN(val)) return Math.round(val)
+  if (typeof val === "number" && !Number.isNaN(val)) return Math.round(Math.abs(val))
   if (typeof val === "string") {
     const cleaned = val.replace(/\s/g, "").replace(/,/g, ".").replace(/[^\d.-]/g, "")
     const n = parseFloat(cleaned)
-    return Number.isNaN(n) ? 0 : Math.round(n)
+    return Number.isNaN(n) ? 0 : Math.round(Math.abs(n))
   }
   return 0
 }
 
-function parseDate(val: unknown): string {
-  if (typeof val === "string" && /^\d{4}-\d{2}-\d{2}/.test(val)) return val.slice(0, 10)
-  if (val instanceof Date) return val.toISOString().slice(0, 10)
-  if (typeof val === "number") {
-    const d = new Date(val)
-    return d.toISOString().slice(0, 10)
-  }
-  if (typeof val === "string") {
-    const parsed = new Date(val)
-    if (!Number.isNaN(parsed.getTime())) return parsed.toISOString().slice(0, 10)
-  }
-  return new Date().toISOString().slice(0, 10)
+function hashExternalId(date: string, time: string, amount: number, merchant: string, card: string, type: string): string {
+  const str = `${date}|${time}|${amount}|${merchant}|${card}|${type}`
+  return createHash("sha256").update(str).digest("hex").slice(0, 32)
 }
 
 export async function POST(request: NextRequest) {
@@ -64,8 +62,22 @@ export async function POST(request: NextRequest) {
   const formData = await request.formData()
   const file = formData.get("file") as File | null
   if (!file || !(file instanceof Blob)) {
+    return NextResponse.json(validationErrorResponse("file required"), { status: 400 })
+  }
+  if (file.size > MAX_FILE_SIZE) {
     return NextResponse.json(
-      validationErrorResponse("file required"),
+      validationErrorResponse(`File too large. Max ${MAX_FILE_SIZE / 1024 / 1024}MB`),
+      { status: 400 }
+    )
+  }
+  const contentType = file.type
+  if (
+    !contentType.includes("spreadsheet") &&
+    !contentType.includes("excel") &&
+    !file.name.match(/\.(xlsx|xls)$/i)
+  ) {
+    return NextResponse.json(
+      validationErrorResponse("Invalid file type. Expected .xlsx or .xls"),
       { status: 400 }
     )
   }
@@ -74,54 +86,88 @@ export async function POST(request: NextRequest) {
   let wb: XLSX.WorkBook
   try {
     wb = XLSX.read(buf, { type: "buffer" })
-  } catch (e) {
+  } catch {
     return NextResponse.json(
       validationErrorResponse("Invalid or unsupported file format"),
       { status: 400 }
     )
   }
 
-  const firstSheet = wb.SheetNames[0]
-  const ws = wb.Sheets[firstSheet]
+  const sheetIdx = wb.SheetNames.findIndex((n) => n === PAYME_SHEET)
+  if (sheetIdx < 0) {
+    return NextResponse.json(
+      validationErrorResponse(`Не найден лист "${PAYME_SHEET}". Убедитесь, что файл экспортирован из Payme.`),
+      { status: 400 }
+    )
+  }
+
+  const ws = wb.Sheets[wb.SheetNames[sheetIdx]]
   const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: "" })
 
   if (rawRows.length === 0) {
-    return NextResponse.json({ rows: [], columns: [] })
+    return NextResponse.json({ rows: [], columns: Object.values(PAYME_COLUMNS), total: 0, totalSpend: 0 })
   }
 
   const sample = rawRows[0] as Record<string, unknown>
-  const merchantCol = findColumn(sample, COLUMN_ALIASES.merchant)
-  const amountCol = findColumn(sample, COLUMN_ALIASES.amount)
-  const dateCol = findColumn(sample, COLUMN_ALIASES.date)
-  const noteCol = findColumn(sample, COLUMN_ALIASES.note)
+  const headers = Object.keys(sample)
+  const missing: string[] = []
+  for (const [key, col] of Object.entries(PAYME_COLUMNS)) {
+    if (!headers.includes(col)) missing.push(col)
+  }
+  if (missing.length > 0) {
+    return NextResponse.json(
+      validationErrorResponse(`Отсутствуют колонки: ${missing.join(", ")}`),
+      { status: 400 }
+    )
+  }
 
-  const rows: PaymePreviewRow[] = rawRows.map((raw, idx) => {
-    const merchant = String(merchantCol ? raw[merchantCol] ?? "" : "").trim() || "Без названия"
-    const amount = parseAmount(amountCol ? raw[amountCol] : 0)
-    const date = parseDate(dateCol ? raw[dateCol] : new Date())
-    const note = noteCol ? String(raw[noteCol] ?? "").trim() || undefined : undefined
-    const external_id = raw._id ? String(raw._id) : `payme-${idx}-${date}-${amount}`
+  const importOnlySpisanie = formData.get("importOnlySpisanie") !== "false"
 
-    return {
+  const rows: PaymePreviewRow[] = []
+  for (let i = 0; i < rawRows.length; i++) {
+    const raw = rawRows[i] as Record<string, unknown>
+    const type = String(raw[PAYME_COLUMNS.type] ?? "").trim()
+    if (importOnlySpisanie && type !== "Списание") continue
+
+    const dateRaw = String(raw[PAYME_COLUMNS.date] ?? "")
+    const dateStr = ddMmYyyyToYyyyMmDd(dateRaw) || (dateRaw.match(/^\d{4}-\d{2}-\d{2}/) ? dateRaw.slice(0, 10) : "")
+    if (!dateStr) continue
+
+    const time = String(raw[PAYME_COLUMNS.time] ?? "").trim()
+    const orgName = String(raw[PAYME_COLUMNS.orgName] ?? "").trim()
+    const supplierName = String(raw[PAYME_COLUMNS.supplierName] ?? "").trim()
+    const merchant = orgName || supplierName || "Без названия"
+    const amount = parseAmount(raw[PAYME_COLUMNS.amount])
+    if (amount <= 0) continue
+
+    const paymeCategory = String(raw[PAYME_COLUMNS.category] ?? "").trim()
+    const comment = String(raw[PAYME_COLUMNS.comment] ?? "").trim()
+    const requisites = String(raw[PAYME_COLUMNS.requisites] ?? "").trim()
+    const note = [comment, requisites].filter(Boolean).join(" ").slice(0, 500)
+    const card = String(raw[PAYME_COLUMNS.cardNumber] ?? "").trim()
+
+    const external_id = hashExternalId(dateStr, time, amount, merchant, card, type)
+
+    rows.push({
+      date: dateStr,
+      time,
+      type,
       merchant,
       amount,
-      date,
+      paymeCategory,
       note,
       external_id,
       raw: raw as Record<string, unknown>,
-    }
-  }).filter((r) => r.amount > 0)
+    })
+  }
 
-  const columns = Object.keys(sample)
+  const previewRows = rows.slice(0, 30)
+  const totalSpend = rows.reduce((s, r) => s + r.amount, 0)
 
   return NextResponse.json({
-    rows,
-    columns,
-    mapping: {
-      merchant: merchantCol,
-      amount: amountCol,
-      date: dateCol,
-      note: noteCol,
-    },
+    rows: previewRows,
+    total: rows.length,
+    totalSpend,
+    columns: Object.values(PAYME_COLUMNS),
   })
 }

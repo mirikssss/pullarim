@@ -65,10 +65,10 @@ export async function POST(request: NextRequest) {
   )
   if (overlaps) {
     return NextResponse.json(
-      validationErrorResponse("Salary mode date range overlaps with existing mode", {
-        start_date: ["Overlapping date range"],
+      validationErrorResponse("Режимы зарплаты пересекаются по датам. Исправьте даты начала/окончания.", {
+        start_date: ["Пересечение с другим режимом"],
       }),
-      { status: 400 }
+      { status: 409 }
     )
   }
 
@@ -154,8 +154,8 @@ export async function PATCH(request: NextRequest) {
     const overlaps = salaryModesOverlap(others ?? [], { start_date: newStart, end_date: newEnd })
     if (overlaps) {
       return NextResponse.json(
-        validationErrorResponse("Salary mode date range overlaps with existing mode"),
-        { status: 400 }
+        validationErrorResponse("Режимы зарплаты пересекаются по датам. Исправьте даты начала/окончания."),
+        { status: 409 }
       )
     }
   }

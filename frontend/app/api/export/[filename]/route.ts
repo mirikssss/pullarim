@@ -54,13 +54,23 @@ export async function GET(
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  const rows = (expenses ?? []).map((e) => ({
+  const list = expenses ?? []
+  const totalSpend = list.reduce((s, e) => s + (e.amount ?? 0), 0)
+  const summaryRow = {
+    Дата: `Итого: ${list.length} записей, период ${from ?? "—"} — ${to ?? "—"}`,
+    Название: "",
+    Категория: "",
+    "Сумма (сум)": totalSpend,
+    Заметка: "",
+  }
+  const dataRows = list.map((e) => ({
     Дата: e.date,
     Название: e.merchant ?? "",
     Категория: e.category_id,
     "Сумма (сум)": e.amount,
     Заметка: e.note ?? "",
   }))
+  const rows = [summaryRow, ...dataRows]
 
   const wb = XLSX.utils.book_new()
   const ws = XLSX.utils.json_to_sheet(rows)

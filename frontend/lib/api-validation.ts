@@ -35,7 +35,6 @@ export function zodErrorToFieldErrors(err: z.ZodError): Record<string, string[]>
 // --- Common schemas ---
 const dateStr = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format YYYY-MM-DD")
 const uuid = z.string().uuid("Invalid UUID")
-const positiveInt = z.number().int().nonnegative()
 
 // --- Expenses ---
 export const expensesGetQuerySchema = z.object({
@@ -49,19 +48,19 @@ export const expensesGetQuerySchema = z.object({
 })
 
 export const expensesPostBodySchema = z.object({
-  merchant: z.string().min(1, "merchant required").transform((s) => s.trim() || "Без названия"),
+  merchant: z.string().min(1, "merchant required").max(120).transform((s) => s.trim() || "Без названия"),
   category_id: z.string().min(1, "category_id required"),
-  amount: z.number().int().nonnegative("amount must be non-negative"),
+  amount: z.number().int().positive("amount must be > 0"),
   date: dateStr.optional().default(() => new Date().toISOString().slice(0, 10)),
-  note: z.string().nullable().optional(),
+  note: z.string().max(500).nullable().optional(),
 })
 
 export const expensesPatchBodySchema = z.object({
-  merchant: z.string().min(1).transform((s) => s.trim()).optional(),
+  merchant: z.string().min(1).max(120).transform((s) => s.trim()).optional(),
   category_id: z.string().min(1).optional(),
-  amount: z.number().int().nonnegative().optional(),
+  amount: z.number().int().positive().optional(),
   date: dateStr.optional(),
-  note: z.string().nullable().optional(),
+  note: z.string().max(500).nullable().optional(),
 }).refine((data) => Object.keys(data).some((k) => data[k as keyof typeof data] !== undefined), {
   message: "No fields to update",
 })
@@ -74,25 +73,42 @@ export const categoriesPostBodySchema = z.object({
 })
 
 // --- Salary modes ---
-export const salaryModesPostBodySchema = z.object({
-  label: z.string().min(1, "label required"),
-  amount: z.number().int().nonnegative("amount required"),
-  start_date: dateStr,
-  end_date: dateStr.nullable().optional(),
-  active: z.boolean().optional().default(false),
-}).refine(
-  (data) => data.active === true || (data.end_date != null && data.end_date !== ""),
-  { message: "end_date required when mode is not active", path: ["end_date"] }
-)
+export const salaryModesPostBodySchema = z
+  .object({
+    label: z.string().min(1, "label required"),
+    amount: z.number().int().nonnegative("amount required"),
+    start_date: dateStr,
+    end_date: dateStr.nullable().optional(),
+    active: z.boolean().optional().default(false),
+  })
+  .refine(
+    (data) => data.active === true || (data.end_date != null && data.end_date !== ""),
+    { message: "end_date required when mode is not active", path: ["end_date"] }
+  )
+  .refine(
+    (data) =>
+      !data.end_date ||
+      data.end_date === "" ||
+      new Date(data.end_date).getTime() >= new Date(data.start_date).getTime(),
+    { message: "end_date must be >= start_date", path: ["end_date"] }
+  )
 
-export const salaryModesPatchBodySchema = z.object({
-  id: uuid,
-  label: z.string().min(1).optional(),
-  amount: z.number().int().nonnegative().optional(),
-  start_date: dateStr.optional(),
-  end_date: dateStr.nullable().optional(),
-  active: z.boolean().optional(),
-})
+export const salaryModesPatchBodySchema = z
+  .object({
+    id: uuid,
+    label: z.string().min(1).optional(),
+    amount: z.number().int().nonnegative().optional(),
+    start_date: dateStr.optional(),
+    end_date: dateStr.nullable().optional(),
+    active: z.boolean().optional(),
+  })
+  .refine(
+    (data) => {
+      if (data.start_date == null || data.end_date == null || data.end_date === "") return true
+      return new Date(data.end_date).getTime() >= new Date(data.start_date).getTime()
+    },
+    { message: "end_date must be >= start_date", path: ["end_date"] }
+  )
 
 // --- Exceptions ---
 export const exceptionsGetQuerySchema = z.object({
