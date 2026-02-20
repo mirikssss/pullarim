@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { getAuthUser, unauthorized } from "@/lib/api-auth"
+import {
+  categoriesPostBodySchema,
+  validationErrorResponse,
+  zodErrorToFieldErrors,
+} from "@/lib/api-validation"
 
 export async function GET() {
   const user = await getAuthUser()
@@ -34,15 +39,20 @@ export async function POST(request: NextRequest) {
   const user = await getAuthUser()
   if (!user) return unauthorized()
 
-  const body = await request.json()
-  const { id, label, color } = body
-
-  if (!id || !label || !color) {
+  let body: unknown
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json(validationErrorResponse("Invalid JSON"), { status: 400 })
+  }
+  const parsed = categoriesPostBodySchema.safeParse(body)
+  if (!parsed.success) {
     return NextResponse.json(
-      { error: "id, label, color required" },
+      validationErrorResponse(parsed.error.message, zodErrorToFieldErrors(parsed.error)),
       { status: 400 }
     )
   }
+  const { id, label, color } = parsed.data
 
   const supabase = await createClient()
   const { data, error } = await supabase

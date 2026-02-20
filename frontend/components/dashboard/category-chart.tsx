@@ -22,7 +22,7 @@ export function CategoryChart({ fadeUp, data }: Props) {
   return (
     <motion.div
       variants={fadeUp}
-      className="rounded-xl border border-border bg-card p-4 shadow-sm"
+      className="rounded-xl border border-border bg-card p-4 shadow-[var(--shadow-card)]"
     >
       <p className="text-sm font-medium text-foreground mb-4">По категориям</p>
       <div className="h-48">

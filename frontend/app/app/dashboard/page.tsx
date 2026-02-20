@@ -149,7 +149,7 @@ export default function DashboardPage() {
         {incomeSummary && (
           <motion.div
             variants={fadeUp}
-            className="rounded-xl border border-border bg-card p-4 shadow-sm"
+            className="rounded-xl border border-border bg-card p-4 shadow-[var(--shadow-card)]"
           >
             <div className="flex items-center gap-2 mb-1">
               <TrendingUp className="w-4 h-4 text-primary" />

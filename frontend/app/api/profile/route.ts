@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { getAuthUser, unauthorized } from "@/lib/api-auth"
+import {
+  profilePatchBodySchema,
+  validationErrorResponse,
+  zodErrorToFieldErrors,
+} from "@/lib/api-validation"
 
 export async function GET() {
   const user = await getAuthUser()
@@ -41,8 +46,20 @@ export async function PATCH(request: NextRequest) {
   const user = await getAuthUser()
   if (!user) return unauthorized()
 
-  const body = await request.json()
-  const { full_name, avatar_url } = body
+  let body: unknown
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json(validationErrorResponse("Invalid JSON"), { status: 400 })
+  }
+  const parsed = profilePatchBodySchema.safeParse(body)
+  if (!parsed.success) {
+    return NextResponse.json(
+      validationErrorResponse(parsed.error.message, zodErrorToFieldErrors(parsed.error)),
+      { status: 400 }
+    )
+  }
+  const { full_name, avatar_url } = parsed.data
 
   const supabase = await createClient()
   const { data, error } = await supabase
@@ -50,8 +67,8 @@ export async function PATCH(request: NextRequest) {
     .upsert(
       {
         id: user.id,
-        full_name: full_name ?? undefined,
-        avatar_url: avatar_url ?? undefined,
+        ...(full_name !== undefined && { full_name }),
+        ...(avatar_url !== undefined && { avatar_url }),
       },
       { onConflict: "id" }
     )

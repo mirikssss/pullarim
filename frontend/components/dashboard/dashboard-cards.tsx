@@ -26,14 +26,15 @@ export function DashboardCards({ fadeUp, forecast }: Props) {
     ? Math.max(0, 20 - day)
     : Math.max(0, (new Date(now.getFullYear(), now.getMonth() + 1, 5).getTime() - now.getTime()) / 86400000)
   const payoutProgress = totalDays > 0 ? ((totalDays - Math.ceil(daysLeft)) / totalDays) * 100 : 0
+  // Следующая выплата: 20-е текущего месяца (если день ≤15) или 5-е следующего месяца (если день >15)
   const nextPayDate = isFirstHalf ? "20" : "5"
-  const nextPayMonth = isFirstHalf && day > 15 ? now.getMonth() + 2 : now.getMonth() + 1
-  const monthName = MONTHS_RU[(nextPayMonth - 1) % 12]
+  const nextPayMonthIndex = isFirstHalf ? now.getMonth() : now.getMonth() + 1
+  const monthName = MONTHS_RU[nextPayMonthIndex % 12]
 
   return (
     <motion.div
       variants={fadeUp}
-      className="rounded-xl border border-border bg-card p-4 shadow-sm"
+      className="rounded-xl border border-border bg-card p-4 shadow-[var(--shadow-card)]"
     >
       <div className="flex items-center gap-2 mb-3">
         <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">

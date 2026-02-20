@@ -82,7 +82,7 @@ export function SpendingSummary({ fadeUp, expenses }: Props) {
   return (
     <motion.div
       variants={fadeUp}
-      className="rounded-xl border border-border bg-card p-4 shadow-sm"
+      className="rounded-xl border border-border bg-card p-4 shadow-[var(--shadow-card)]"
     >
       {/* Segmented Control */}
       <div className="flex gap-1 p-1 rounded-lg bg-secondary mb-4">
@@ -97,7 +97,7 @@ export function SpendingSummary({ fadeUp, expenses }: Props) {
             {range === r.key && (
               <motion.div
                 layoutId="spending-range"
-                className="absolute inset-0 rounded-md bg-card border border-border shadow-sm"
+                className="absolute inset-0 rounded-md bg-card border border-border shadow-[var(--shadow-card)]"
                 transition={{ type: "spring", bounce: 0.15, duration: 0.5 }}
               />
             )}

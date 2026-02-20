@@ -199,7 +199,7 @@ export default function ExpensesPage() {
               key="table"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="rounded-xl border border-border bg-card overflow-hidden shadow-sm"
+              className="rounded-xl border border-border bg-card overflow-hidden shadow-[var(--shadow-card)]"
             >
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -248,7 +248,7 @@ function ExpenseCard({ expense, categories, fadeUp }: { expense: Expense; catego
   return (
     <motion.div
       variants={fadeUp}
-      className="flex items-center gap-3 p-3 rounded-xl border border-border bg-card hover:bg-card/90 transition-colors shadow-sm"
+      className="flex items-center gap-3 p-3 rounded-xl border border-border bg-card hover:bg-card/90 transition-colors shadow-[var(--shadow-card)]"
     >
       <div className={`w-2 h-10 rounded-full ${getCategoryColor(categories, expense.category_id)}`} />
       <div className="flex-1 min-w-0">

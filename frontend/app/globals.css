@@ -27,6 +27,7 @@
   --chart-4: oklch(0.60 0.08 200);
   --chart-5: oklch(0.42 0.08 155);
   --radius: 0.75rem;
+  --shadow-card: 0 2px 12px 4px rgba(0, 0, 0, 0.06);
   --sidebar: oklch(0.98 0.005 155);
   --sidebar-foreground: oklch(0.15 0.02 155);
   --sidebar-primary: oklch(0.40 0.12 160);

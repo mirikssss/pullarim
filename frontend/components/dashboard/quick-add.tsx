@@ -52,7 +52,7 @@ export function QuickAdd({ fadeUp, onSuccess }: Props) {
   return (
     <motion.div
       variants={fadeUp}
-      className="rounded-xl border border-border bg-card p-4 shadow-sm"
+      className="rounded-xl border border-border bg-card p-4 shadow-[var(--shadow-card)]"
     >
       <p className="text-sm font-medium text-foreground mb-3">Быстрый расход</p>
       <div className="flex gap-2">

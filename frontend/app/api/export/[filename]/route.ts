@@ -8,13 +8,21 @@ import {
 } from "@/lib/api-validation"
 import * as XLSX from "xlsx"
 
-export async function GET(request: NextRequest) {
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ filename: string }> }
+) {
+  const { filename } = await params
+  if (filename !== "expenses.xlsx") {
+    return NextResponse.json({ error: "Not found" }, { status: 404 })
+  }
+
   const user = await getAuthUser()
   if (!user) return unauthorized()
 
   const { searchParams } = new URL(request.url)
   const parsed = exportQuerySchema.safeParse({
-    format: searchParams.get("format") ?? "csv",
+    format: "xlsx",
     from: searchParams.get("from") ?? undefined,
     to: searchParams.get("to") ?? undefined,
     category_id: searchParams.get("category_id") ?? undefined,
@@ -26,7 +34,7 @@ export async function GET(request: NextRequest) {
       { status: 400 }
     )
   }
-  const { format, from, to, category_id, q } = parsed.data
+  const { from, to, category_id, q } = parsed.data
 
   const supabase = await createClient()
   let query = supabase
@@ -54,34 +62,15 @@ export async function GET(request: NextRequest) {
     Заметка: e.note ?? "",
   }))
 
-  if (format === "xlsx") {
-    const wb = XLSX.utils.book_new()
-    const ws = XLSX.utils.json_to_sheet(rows)
-    XLSX.utils.book_append_sheet(wb, ws, "Расходы")
-    const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" })
-    return new NextResponse(buf, {
-      headers: {
-        "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "Content-Disposition": `attachment; filename="pullarim-expenses-${new Date().toISOString().slice(0, 10)}.xlsx"`,
-      },
-    })
-  }
+  const wb = XLSX.utils.book_new()
+  const ws = XLSX.utils.json_to_sheet(rows)
+  XLSX.utils.book_append_sheet(wb, ws, "Расходы")
+  const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" })
 
-  const headers = ["Дата", "Название", "Категория", "Сумма (сум)", "Заметка"]
-  const csvRows = (expenses ?? []).map((e) => [
-    e.date,
-    `"${(e.merchant ?? "").replace(/"/g, '""')}"`,
-    e.category_id,
-    e.amount,
-    `"${(e.note ?? "").replace(/"/g, '""')}"`,
-  ])
-  const csv = [headers.join(","), ...csvRows.map((r) => r.join(","))].join("\n")
-  const bom = "\uFEFF"
-
-  return new NextResponse(bom + csv, {
+  return new NextResponse(buf, {
     headers: {
-      "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": `attachment; filename="pullarim-export-${new Date().toISOString().slice(0, 10)}.csv"`,
+      "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "Content-Disposition": `attachment; filename="pullarim-expenses-${new Date().toISOString().slice(0, 10)}.xlsx"`,
     },
   })
 }

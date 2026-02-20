@@ -24,6 +24,7 @@ export interface SalaryMode {
   label: string
   amount: number
   start_date: string
+  end_date?: string | null
   active: boolean
   user_id?: string
 }

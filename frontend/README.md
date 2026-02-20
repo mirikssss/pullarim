@@ -35,6 +35,7 @@ Pullarim -- мобильное веб-приложение для трекинг
 1. В Supabase Dashboard откройте **SQL Editor**.
 2. Выполните `scripts/001-init.sql` (создание таблиц, индексов, RLS).
 3. Выполните `scripts/002-seed-categories.sql` (дефолтные категории).
+4. Выполните `scripts/003-add-end-date.sql` (поле end_date для режимов зарплаты).
 
 ### 3. Переменные окружения
 

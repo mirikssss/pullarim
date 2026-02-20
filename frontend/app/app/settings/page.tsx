@@ -116,7 +116,7 @@ export default function SettingsPage() {
         {/* Profile Card - editable */}
         <motion.div
           variants={fadeUp}
-          className="rounded-xl border border-border bg-card p-4 shadow-sm"
+          className="rounded-xl border border-border bg-card p-4 shadow-[var(--shadow-card)]"
         >
           <button
             onClick={openEdit}
@@ -138,7 +138,7 @@ export default function SettingsPage() {
         </motion.div>
 
         {/* Preferences - only real options */}
-        <motion.div variants={fadeUp} className="rounded-xl border border-border bg-card overflow-hidden shadow-sm">
+        <motion.div variants={fadeUp} className="rounded-xl border border-border bg-card overflow-hidden shadow-[var(--shadow-card)]">
           <div className="px-4 py-3 border-b border-border">
             <p className="text-sm font-medium text-foreground">Настройки</p>
           </div>
@@ -159,7 +159,7 @@ export default function SettingsPage() {
         </motion.div>
 
         {/* Data Section */}
-        <motion.div variants={fadeUp} className="rounded-xl border border-border bg-card overflow-hidden shadow-sm">
+        <motion.div variants={fadeUp} className="rounded-xl border border-border bg-card overflow-hidden shadow-[var(--shadow-card)]">
           <div className="px-4 py-3 border-b border-border">
             <p className="text-sm font-medium text-foreground">Данные</p>
           </div>

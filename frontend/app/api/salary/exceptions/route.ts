@@ -1,17 +1,27 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { getAuthUser, unauthorized } from "@/lib/api-auth"
+import {
+  exceptionsGetQuerySchema,
+  exceptionsPostBodySchema,
+  exceptionsDeleteQuerySchema,
+  validationErrorResponse,
+  zodErrorToFieldErrors,
+} from "@/lib/api-validation"
 
 export async function GET(request: NextRequest) {
   const user = await getAuthUser()
   if (!user) return unauthorized()
 
   const { searchParams } = new URL(request.url)
-  const month = searchParams.get("month") // YYYY-MM
-
-  if (!month) {
-    return NextResponse.json({ error: "month (YYYY-MM) required" }, { status: 400 })
+  const parsed = exceptionsGetQuerySchema.safeParse({ month: searchParams.get("month") })
+  if (!parsed.success) {
+    return NextResponse.json(
+      validationErrorResponse(parsed.error.message, zodErrorToFieldErrors(parsed.error)),
+      { status: 400 }
+    )
   }
+  const { month } = parsed.data
 
   const [y, m] = month.split("-").map(Number)
   const start = new Date(y, m - 1, 1)
@@ -38,12 +48,20 @@ export async function POST(request: NextRequest) {
   const user = await getAuthUser()
   if (!user) return unauthorized()
 
-  const body = await request.json()
-  const { date } = body
-
-  if (!date) {
-    return NextResponse.json({ error: "date (YYYY-MM-DD) required" }, { status: 400 })
+  let body: unknown
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json(validationErrorResponse("Invalid JSON"), { status: 400 })
   }
+  const parsed = exceptionsPostBodySchema.safeParse(body)
+  if (!parsed.success) {
+    return NextResponse.json(
+      validationErrorResponse(parsed.error.message, zodErrorToFieldErrors(parsed.error)),
+      { status: 400 }
+    )
+  }
+  const { date } = parsed.data
 
   const supabase = await createClient()
   const { data, error } = await supabase
@@ -63,11 +81,14 @@ export async function DELETE(request: NextRequest) {
   if (!user) return unauthorized()
 
   const { searchParams } = new URL(request.url)
-  const date = searchParams.get("date")
-
-  if (!date) {
-    return NextResponse.json({ error: "date (YYYY-MM-DD) required" }, { status: 400 })
+  const parsed = exceptionsDeleteQuerySchema.safeParse({ date: searchParams.get("date") })
+  if (!parsed.success) {
+    return NextResponse.json(
+      validationErrorResponse(parsed.error.message, zodErrorToFieldErrors(parsed.error)),
+      { status: 400 }
+    )
   }
+  const { date } = parsed.data
 
   const supabase = await createClient()
   const { error } = await supabase
