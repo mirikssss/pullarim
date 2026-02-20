@@ -15,6 +15,8 @@ import {
   TrendingUp,
   Plus,
   Loader2,
+  Pencil,
+  Trash2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -38,6 +40,16 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 const stagger = {
   hidden: { opacity: 0 },
@@ -90,6 +102,13 @@ export default function SalaryPage() {
   const [editStartDate, setEditStartDate] = useState("")
   const [editEndDate, setEditEndDate] = useState("")
   const [savingEdit, setSavingEdit] = useState(false)
+  const [paymentDetailOpen, setPaymentDetailOpen] = useState(false)
+  const [paymentDetail, setPaymentDetail] = useState<Payment | null>(null)
+  const [editPaymentOpen, setEditPaymentOpen] = useState(false)
+  const [editPayDate, setEditPayDate] = useState("")
+  const [editPayAmount, setEditPayAmount] = useState("")
+  const [savingPayment, setSavingPayment] = useState(false)
+  const [deletePaymentOpen, setDeletePaymentOpen] = useState(false)
 
   const monthStr = `${year}-${String(month + 1).padStart(2, "0")}`
 
@@ -275,6 +294,57 @@ export default function SalaryPage() {
     }
   }
 
+  const openPaymentDetail = (item: Payment) => {
+    setPaymentDetail(item)
+    setEditPayDate(item.pay_date)
+    setEditPayAmount(String(item.amount))
+    setPaymentDetailOpen(true)
+  }
+
+  const saveEditPayment = async () => {
+    if (!paymentDetail) return
+    setSavingPayment(true)
+    try {
+      await fetch("/api/salary/payments", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: paymentDetail.id,
+          pay_date: editPayDate,
+          amount: Number(editPayAmount),
+        }),
+      })
+      mutatePayments()
+      mutatePaymentsForReceived()
+      mutateIncome()
+      setEditPaymentOpen(false)
+      setPaymentDetailOpen(false)
+      setPaymentDetail(null)
+    } catch {
+      // TODO: toast
+    } finally {
+      setSavingPayment(false)
+    }
+  }
+
+  const handleDeletePayment = async () => {
+    if (!paymentDetail) return
+    setSavingPayment(true)
+    try {
+      await fetch(`/api/salary/payments/${paymentDetail.id}`, { method: "DELETE" })
+      mutatePayments()
+      mutatePaymentsForReceived()
+      mutateIncome()
+      setDeletePaymentOpen(false)
+      setPaymentDetailOpen(false)
+      setPaymentDetail(null)
+    } catch {
+      // TODO: toast
+    } finally {
+      setSavingPayment(false)
+    }
+  }
+
   const lastDay = new Date(year, month + 1, 0).getDate()
   const period1Str = `1–15 ${new Date(year, month).toLocaleDateString("ru-RU", { month: "short" })}`
   const period2Str = `16–${lastDay} ${new Date(year, month).toLocaleDateString("ru-RU", { month: "short" })}`
@@ -430,6 +500,7 @@ export default function SalaryPage() {
               const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(d.day).padStart(2, "0")}`
               const isToday = d.day === now.getDate() && month === now.getMonth() && year === now.getFullYear()
               const isException = exceptionDates.has(dateStr)
+              const isWeekend = !d.isWeekday
 
               return (
                 <button
@@ -440,7 +511,9 @@ export default function SalaryPage() {
                       ? "bg-primary/10 text-primary border border-primary/20"
                       : d.isWeekday && isException
                         ? "bg-destructive/8 text-destructive/70 border border-destructive/15"
-                        : "bg-secondary text-muted-foreground hover:bg-secondary/80 border border-transparent"
+                        : isWeekend
+                          ? "bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20"
+                          : "bg-secondary/80 text-muted-foreground hover:bg-secondary border border-border/50"
                   } ${isToday ? "ring-2 ring-primary/30 ring-offset-1 ring-offset-card" : ""}`}
                   aria-label={`${d.day} ${new Date(year, month).toLocaleDateString("ru-RU", { month: "long" })}${worked ? " (рабочий)" : " (выходной)"}${isException ? " (исключение)" : ""}`}
                 >
@@ -552,19 +625,15 @@ export default function SalaryPage() {
             <Settings2 className="w-4 h-4 text-primary" />
             <p className="text-sm font-medium text-foreground">Режим / Ставка</p>
           </div>
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-0">
             {modes.map((mode) => (
               <button
                 key={mode.id}
                 type="button"
                 onClick={() => openEditMode(mode)}
-                className={`flex items-center gap-3 p-3 rounded-lg border transition-colors text-left w-full ${
-                  mode.active
-                    ? "bg-primary/5 border-primary/20 hover:bg-primary/10"
-                    : "bg-secondary border-border hover:bg-secondary/80"
-                }`}
+                className="flex items-center gap-3 p-3 rounded-none border-b border-border last:border-0 transition-colors text-left w-full hover:bg-secondary/50"
               >
-                <div className={`w-1 h-10 rounded-full ${mode.active ? "bg-primary" : "bg-muted-foreground/30"}`} />
+                <div className={`w-1 h-8 rounded-full shrink-0 ${mode.active ? "bg-primary" : "bg-muted-foreground/30"}`} />
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
                     <p className="text-sm font-medium text-foreground">{mode.label}</p>
@@ -608,27 +677,30 @@ export default function SalaryPage() {
               ))}
             </select>
           </div>
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-0">
             {payments.map((item) => (
-              <div
+              <button
                 key={item.id}
-                className="flex items-center justify-between py-2.5 border-b border-border last:border-0"
+                type="button"
+                onClick={() => openPaymentDetail(item)}
+                className="flex items-center justify-between w-full py-2.5 px-0 border-b border-border last:border-0 text-left hover:bg-secondary/50 transition-colors rounded-none"
               >
-                <div>
-                  <p className="text-sm text-foreground">{item.period}</p>
+                <div className="min-w-0">
+                  <p className="text-sm text-foreground truncate">{item.period}</p>
                   <p className="text-xs text-muted-foreground">
                     {new Date(item.pay_date).toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 shrink-0">
                   <span className="text-sm font-medium text-foreground">{formatUZS(item.amount)}</span>
                   {item.received && (
                     <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center">
                       <Check className="w-3 h-3 text-primary" />
                     </div>
                   )}
+                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
                 </div>
-              </div>
+              </button>
             ))}
             {payments.length === 0 && (
               <p className="text-sm text-muted-foreground py-4 text-center">Нет выплат за выбранный год</p>
@@ -763,6 +835,123 @@ export default function SalaryPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Payment detail popup */}
+      <Dialog open={paymentDetailOpen} onOpenChange={(o) => !o && (setPaymentDetail(null), setEditPaymentOpen(false), setDeletePaymentOpen(false))}>
+        <DialogContent className="bg-card border-border max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">Выплата</DialogTitle>
+          </DialogHeader>
+          {paymentDetail && (
+            <div className="flex flex-col gap-4 py-2">
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Период</p>
+                <p className="text-base font-medium text-foreground">{paymentDetail.period}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Дата получения</p>
+                <p className="text-base font-medium text-foreground">
+                  {new Date(paymentDetail.pay_date).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" })}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Сумма</p>
+                <p className="text-xl font-bold text-foreground">{formatUZS(paymentDetail.amount)}</p>
+              </div>
+              {paymentDetail.received && (
+                <div className="flex items-center gap-2 text-primary text-sm">
+                  <Check className="w-4 h-4" />
+                  Получено
+                </div>
+              )}
+              <div className="flex gap-2 pt-2">
+                <Button
+                  variant="outline"
+                  className="flex-1 border-border"
+                  onClick={() => setEditPaymentOpen(true)}
+                >
+                  <Pencil className="w-4 h-4 mr-1" />
+                  Изменить
+                </Button>
+                <Button
+                  variant="outline"
+                  className="flex-1 border-destructive/50 text-destructive hover:bg-destructive/10"
+                  onClick={() => setDeletePaymentOpen(true)}
+                >
+                  <Trash2 className="w-4 h-4 mr-1" />
+                  Удалить
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit payment dialog (nested) */}
+      <Dialog open={editPaymentOpen} onOpenChange={setEditPaymentOpen}>
+        <DialogContent className="bg-card border-border max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">Изменить выплату</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-3 py-2">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="edit-pay-date" className="text-sm">Дата получения</Label>
+              <Input
+                id="edit-pay-date"
+                type="date"
+                value={editPayDate}
+                onChange={(e) => setEditPayDate(e.target.value)}
+                className="bg-secondary border-border"
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="edit-pay-amount" className="text-sm">Сумма (сум)</Label>
+              <Input
+                id="edit-pay-amount"
+                type="number"
+                value={editPayAmount}
+                onChange={(e) => setEditPayAmount(e.target.value)}
+                className="bg-secondary border-border"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditPaymentOpen(false)} className="border-border">
+              Отмена
+            </Button>
+            <Button onClick={saveEditPayment} disabled={savingPayment} className="bg-primary text-primary-foreground">
+              {savingPayment ? <Loader2 className="w-4 h-4 animate-spin" /> : "Сохранить"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete payment confirmation */}
+      <AlertDialog open={deletePaymentOpen} onOpenChange={setDeletePaymentOpen}>
+        <AlertDialogContent className="bg-card border-border max-w-sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-foreground">Удалить выплату?</AlertDialogTitle>
+            <AlertDialogDescription className="text-muted-foreground">
+              {paymentDetail && (
+                <>Период {paymentDetail.period}, {formatUZS(paymentDetail.amount)}. Действие нельзя отменить.</>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="border-border text-foreground">Отмена</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={(e) => {
+                e.preventDefault()
+                handleDeletePayment()
+              }}
+              disabled={savingPayment}
+            >
+              {savingPayment ? <Loader2 className="w-4 h-4 animate-spin" /> : "Удалить"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Mark received dialog */}
       <Dialog open={markReceivedOpen} onOpenChange={(open) => !open && setMarkReceivedData(null)}>

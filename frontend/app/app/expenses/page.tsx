@@ -94,6 +94,7 @@ export default function ExpensesPage() {
   const [range, setRange] = useState<QuickRange>("month")
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [editExpense, setEditExpense] = useState<Expense | null>(null)
+  const [detailExpense, setDetailExpense] = useState<Expense | null>(null)
   const [deleteExpense, setDeleteExpense] = useState<Expense | null>(null)
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -386,7 +387,7 @@ export default function ExpensesPage() {
               variants={stagger}
               initial="hidden"
               animate="show"
-              className="flex flex-col gap-2"
+              className="flex flex-col rounded-xl border border-border bg-card overflow-hidden px-4"
             >
               {expenses.map((expense) => (
                 <ExpenseCard
@@ -396,6 +397,7 @@ export default function ExpensesPage() {
                   fadeUp={fadeUp}
                   selected={selectedIds.has(expense.id)}
                   onToggleSelect={toggleSelect}
+                  onDetailClick={() => setDetailExpense(expense)}
                   onEdit={() => setEditExpense(expense)}
                   onDelete={() => setDeleteExpense(expense)}
                   showActions
@@ -410,13 +412,13 @@ export default function ExpensesPage() {
               key="table"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="rounded-xl border border-border bg-card overflow-hidden shadow-[var(--shadow-card)]"
+              className="rounded-xl border border-border bg-card overflow-hidden"
             >
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+              <div className="overflow-x-auto max-w-full">
+                <table className="w-full text-sm min-w-0">
                   <thead>
                     <tr className="border-b border-border">
-                      <th className="w-10 px-2 py-3 text-center">
+                      <th className="w-10 px-2 py-3 text-center shrink-0">
                         <button
                           onClick={toggleSelectAll}
                           className="text-muted-foreground hover:text-foreground"
@@ -429,27 +431,31 @@ export default function ExpensesPage() {
                           )}
                         </button>
                       </th>
-                      <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Название</th>
-                      <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Категория</th>
-                      <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Дата</th>
-                      <th className="text-right px-4 py-3 text-xs font-medium text-muted-foreground">Сумма</th>
-                      <th className="w-20 px-2 py-3" />
+                      <th className="text-left px-3 md:px-4 py-3 text-xs font-medium text-muted-foreground">Название</th>
+                      <th className="text-left px-2 py-3 text-xs font-medium text-muted-foreground hidden md:table-cell">Категория</th>
+                      <th className="text-left px-2 py-3 text-xs font-medium text-muted-foreground hidden md:table-cell">Дата</th>
+                      <th className="text-right px-3 md:px-4 py-3 text-xs font-medium text-muted-foreground">Сумма</th>
+                      <th className="w-20 px-2 py-3 hidden md:table-cell" />
                     </tr>
                   </thead>
                   <tbody>
                     {groupExpensesByDate(expenses).map((group) => (
                       <Fragment key={group.date}>
                         <tr className="border-t-2 border-border bg-secondary/30">
-                          <td colSpan={4} className="px-4 py-2 text-xs font-medium text-muted-foreground">
+                          <td colSpan={4} className="px-3 md:px-4 py-2 text-xs font-medium text-muted-foreground">
                             {formatDateLabel(group.date)}
                           </td>
-                          <td colSpan={2} className="px-4 py-2 text-right text-xs font-medium text-muted-foreground">
+                          <td colSpan={2} className="px-3 md:px-4 py-2 text-right text-xs font-medium text-muted-foreground">
                             {formatUZS(group.dayTotal)}
                           </td>
                         </tr>
                         {group.items.map((expense) => (
-                          <tr key={expense.id} className="border-b border-border hover:bg-secondary/50 transition-colors">
-                            <td className="px-2 py-3 text-center">
+                          <tr
+                            key={expense.id}
+                            className="border-b border-border hover:bg-secondary/50 transition-colors cursor-pointer"
+                            onClick={() => setDetailExpense(expense)}
+                          >
+                            <td className="px-2 py-3 text-center shrink-0" onClick={(e) => e.stopPropagation()}>
                               <button
                                 onClick={() => toggleSelect(expense.id)}
                                 className="text-muted-foreground hover:text-foreground"
@@ -461,17 +467,17 @@ export default function ExpensesPage() {
                                 )}
                               </button>
                             </td>
-                            <td className="px-4 py-3 text-foreground">{expense.merchant}</td>
-                            <td className="px-4 py-3">
+                            <td className="px-3 md:px-4 py-3 text-foreground truncate max-w-[120px] md:max-w-none">{expense.merchant}</td>
+                            <td className="px-2 py-3 hidden md:table-cell">
                               <Badge variant="outline" className="text-[10px] border-border text-muted-foreground">
                                 {getCategoryLabel(categories, expense.category_id)}
                               </Badge>
                             </td>
-                            <td className="px-4 py-3 text-muted-foreground text-xs">
+                            <td className="px-2 py-3 text-muted-foreground text-xs hidden md:table-cell">
                               {new Date(expense.date).toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}
                             </td>
-                            <td className="px-4 py-3 text-right font-medium text-foreground">{formatUZS(expense.amount)}</td>
-                            <td className="px-2 py-3">
+                            <td className="px-3 md:px-4 py-3 text-right font-medium text-foreground shrink-0">{formatUZS(expense.amount)}</td>
+                            <td className="px-2 py-3 hidden md:table-cell" onClick={(e) => e.stopPropagation()}>
                               <div className="flex items-center gap-0.5">
                                 <button
                                   onClick={() => setEditExpense(expense)}
@@ -507,6 +513,69 @@ export default function ExpensesPage() {
           )}
         </AnimatePresence>
       </div>
+
+      {/* Detail popup (mobile / row click) */}
+      <Dialog open={!!detailExpense} onOpenChange={(o) => !o && setDetailExpense(null)}>
+        <DialogContent className="bg-card border-border max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">Расход</DialogTitle>
+          </DialogHeader>
+          {detailExpense && (
+            <div className="flex flex-col gap-4 py-2">
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Название</p>
+                <p className="text-base font-medium text-foreground">{detailExpense.merchant}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Категория</p>
+                <p className="text-base font-medium text-foreground">
+                  {getCategoryLabel(categories, detailExpense.category_id)}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Дата</p>
+                <p className="text-base font-medium text-foreground">
+                  {new Date(detailExpense.date).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" })}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm text-muted-foreground">Сумма</p>
+                <p className="text-xl font-bold text-foreground">{formatUZS(detailExpense.amount)}</p>
+              </div>
+              {detailExpense.note && (
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Заметка</p>
+                  <p className="text-sm text-foreground">{detailExpense.note}</p>
+                </div>
+              )}
+              <div className="flex gap-2 pt-2">
+                <Button
+                  variant="outline"
+                  className="flex-1 border-border"
+                  onClick={() => {
+                    setEditExpense(detailExpense)
+                    setDetailExpense(null)
+                  }}
+                >
+                  <Pencil className="w-4 h-4 mr-1" />
+                  Изменить
+                </Button>
+                <Button
+                  variant="outline"
+                  className="flex-1 border-destructive/50 text-destructive hover:bg-destructive/10"
+                  onClick={() => {
+                    setDeleteExpense(detailExpense)
+                    setDetailExpense(null)
+                  }}
+                >
+                  <Trash2 className="w-4 h-4 mr-1" />
+                  Удалить
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Edit Dialog */}
       <ExpenseEditDialog
@@ -578,6 +647,7 @@ function ExpenseCard({
   fadeUp,
   selected,
   onToggleSelect,
+  onDetailClick,
   onEdit,
   onDelete,
   showActions,
@@ -587,6 +657,7 @@ function ExpenseCard({
   fadeUp: typeof fadeUp
   selected?: boolean
   onToggleSelect?: (id: string) => void
+  onDetailClick?: () => void
   onEdit?: () => void
   onDelete?: () => void
   showActions?: boolean
@@ -594,8 +665,8 @@ function ExpenseCard({
   return (
     <motion.div
       variants={fadeUp}
-      className={`flex items-center gap-3 p-3 rounded-xl border border-border bg-card hover:bg-card/90 transition-colors shadow-[var(--shadow-card)] ${
-        selected ? "ring-2 ring-primary/50" : ""
+      className={`flex items-center gap-3 py-3 border-b border-border last:border-0 hover:bg-secondary/50 transition-colors ${
+        selected ? "ring-2 ring-primary/50 ring-inset" : ""
       }`}
     >
       {showActions && onToggleSelect && (
@@ -608,7 +679,7 @@ function ExpenseCard({
       )}
       <div className={`w-2 h-10 rounded-full shrink-0 ${getCategoryColor(categories, expense.category_id)}`} />
       <button
-        onClick={onEdit}
+        onClick={onDetailClick}
         className="flex-1 min-w-0 text-left"
       >
         <p className="text-sm font-medium text-foreground truncate">{expense.merchant}</p>
