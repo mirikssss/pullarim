@@ -1,9 +1,23 @@
 "use client"
 
-import { useState, useCallback, useEffect, Fragment } from "react"
+import { useState, useCallback, useEffect, useMemo, Fragment } from "react"
 import useSWR from "swr"
 import { motion, AnimatePresence } from "framer-motion"
-import { LayoutGrid, List, ChevronDown, Plus, Search, X, Download, Upload, Pencil, Trash2, Loader2, CheckSquare, Square, Banknote } from "lucide-react"
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  PieChart,
+  Pie,
+  Cell,
+} from "recharts"
+import { LayoutGrid, List, ChartBar, ChevronDown, Plus, Search, X, Download, Upload, Pencil, Trash2, Loader2, CheckSquare, Square, Banknote } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -33,19 +47,29 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { formatUZS } from "@/lib/formatters"
+import { formatUZS, formatUZSShort } from "@/lib/formatters"
 import { fetcher, expensesKey, categoriesKey } from "@/lib/api"
 import type { Expense, Category } from "@/lib/types"
 import Link from "next/link"
 
-type ViewMode = "cards" | "table"
-type QuickRange = "today" | "7d" | "15d" | "month"
+type ViewMode = "cards" | "table" | "charts"
+type QuickRange = "today" | "7d" | "15d" | "month" | "custom"
 
-const RANGES = [
-  { key: "today" as const, label: "Сегодня" },
-  { key: "7d" as const, label: "7 дней" },
-  { key: "15d" as const, label: "15 дней" },
-  { key: "month" as const, label: "Месяц" },
+const RANGES: { key: QuickRange; label: string }[] = [
+  { key: "today", label: "Сегодня" },
+  { key: "7d", label: "7 дней" },
+  { key: "15d", label: "15 дней" },
+  { key: "month", label: "Месяц" },
+  { key: "custom", label: "Свой период" },
+]
+
+const CHART_COLORS = [
+  "var(--color-chart-1)",
+  "var(--color-chart-2)",
+  "var(--color-chart-3)",
+  "var(--color-chart-4)",
+  "var(--color-chart-5)",
+  "var(--color-primary)",
 ]
 
 const stagger = {
@@ -107,11 +131,84 @@ export default function ExpensesPage() {
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
-  const expensesUrl = expensesKey(range) + (searchQuery ? `&search=${encodeURIComponent(searchQuery)}` : "") + (categoryFilter !== "all" ? `&category_id=${categoryFilter}` : "")
+  const now = new Date()
+  const todayStr = now.toISOString().slice(0, 10)
+  const firstDayOfMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`
+  const [customDateFrom, setCustomDateFrom] = useState(firstDayOfMonth)
+  const [customDateTo, setCustomDateTo] = useState(todayStr)
+
+  const baseExpensesUrl =
+    range === "custom"
+      ? `${expensesKey("month")}&date_from=${customDateFrom}&date_to=${customDateTo}`
+      : expensesKey(range)
+  const expensesUrl =
+    baseExpensesUrl +
+    (searchQuery ? `&search=${encodeURIComponent(searchQuery)}` : "") +
+    (categoryFilter !== "all" ? `&category_id=${categoryFilter}` : "")
   const { data: expenses = [], mutate } = useSWR<Expense[]>(expensesUrl, fetcher)
   const { data: categories = [] } = useSWR<Category[]>(categoriesKey(), fetcher)
 
   const periodTotal = expenses.reduce((s, e) => s + e.amount, 0)
+
+  const chartData = useMemo(() => {
+    const byDay: Record<string, number> = {}
+    const byCategory: Record<string, { name: string; value: number; fill: string }> = {}
+    const byMerchant: Record<string, number> = {}
+    const byPaymentMethod: Record<string, number> = { card: 0, cash: 0, other: 0 }
+    const byDayByCategory: Record<string, Record<string, number>> = {}
+    expenses.forEach((e) => {
+      byDay[e.date] = (byDay[e.date] ?? 0) + e.amount
+      const catLabel = getCategoryLabel(categories, e.category_id)
+      if (!byCategory[e.category_id]) {
+        byCategory[e.category_id] = {
+          name: catLabel,
+          value: 0,
+          fill: CHART_COLORS[Object.keys(byCategory).length % CHART_COLORS.length],
+        }
+      }
+      byCategory[e.category_id].value += e.amount
+      const pm = e.payment_method === "cash" ? "cash" : e.payment_method === "card" ? "card" : "other"
+      byPaymentMethod[pm] += e.amount
+      if (!byDayByCategory[e.date]) byDayByCategory[e.date] = {}
+      byDayByCategory[e.date][catLabel] = (byDayByCategory[e.date][catLabel] ?? 0) + e.amount
+      const m = (e.merchant || "").trim() || "Без названия"
+      byMerchant[m] = (byMerchant[m] ?? 0) + e.amount
+    })
+    const spendingByDay = Object.entries(byDay)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, amount]) => ({
+        day: new Date(date + "T12:00:00").toLocaleDateString("ru-RU", { day: "numeric", month: "short" }),
+        date,
+        amount,
+      }))
+    const categoryBreakdown = Object.values(byCategory).filter((c) => c.value > 0)
+    const paymentBreakdown = [
+      { name: "Карта", value: byPaymentMethod.card, fill: "var(--color-chart-1)" },
+      { name: "Наличные", value: byPaymentMethod.cash, fill: "var(--color-chart-2)" },
+      ...(byPaymentMethod.other > 0 ? [{ name: "Не указан", value: byPaymentMethod.other, fill: "var(--color-muted-foreground)" }] : []),
+    ].filter((x) => x.value > 0)
+    const catNames = categoryBreakdown.map((c) => c.name)
+    const dailyByCategory = spendingByDay.map(({ day, date }) => {
+      const row: Record<string, string | number> = { day, date }
+      catNames.forEach((name) => {
+        row[name] = byDayByCategory[date]?.[name] ?? 0
+      })
+      return row
+    })
+    const topMerchants = Object.entries(byMerchant)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10)
+    return {
+      spendingByDay,
+      categoryBreakdown,
+      topMerchants,
+      paymentBreakdown,
+      dailyByCategory,
+      catNames,
+      categoryColors: Object.fromEntries(categoryBreakdown.map((c, i) => [c.name, c.fill])),
+    }
+  }, [expenses, categories])
   const isSelectionMode = selectionMode
 
   const toggleSelect = useCallback((id: string) => {
@@ -247,6 +344,15 @@ export default function ExpensesPage() {
               >
                 <List className="w-3.5 h-3.5" />
               </button>
+              <button
+                onClick={() => setViewMode("charts")}
+                className={`p-1.5 rounded-sm transition-colors ${
+                  viewMode === "charts" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground"
+                }`}
+                aria-label="Графики"
+              >
+                <ChartBar className="w-3.5 h-3.5" />
+              </button>
             </div>
           </div>
         </div>
@@ -255,25 +361,45 @@ export default function ExpensesPage() {
       {/* Content */}
       <div className="p-3 sm:p-4 flex flex-col gap-4">
         {/* Quick Range Filters */}
-        <div className="flex gap-1 p-1 rounded-lg bg-secondary">
-          {RANGES.map((r) => (
-            <button
-              key={r.key}
-              onClick={() => setRange(r.key)}
-              className={`relative flex-1 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                range === r.key ? "text-foreground" : "text-muted-foreground hover:text-foreground/80"
-              }`}
-            >
-              {range === r.key && (
-                <motion.div
-                  layoutId="expense-range"
-                  className="absolute inset-0 rounded-md bg-card border border-border shadow-sm"
-                  transition={{ type: "spring", bounce: 0.15, duration: 0.5 }}
-                />
-              )}
-              <span className="relative z-10">{r.label}</span>
-            </button>
-          ))}
+        <div className="flex flex-col gap-2">
+          <div className="flex gap-1 p-1 rounded-lg bg-secondary">
+            {RANGES.map((r) => (
+              <button
+                key={r.key}
+                onClick={() => setRange(r.key)}
+                className={`relative flex-1 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                  range === r.key ? "text-foreground" : "text-muted-foreground hover:text-foreground/80"
+                }`}
+              >
+                {range === r.key && (
+                  <motion.div
+                    layoutId="expense-range"
+                    className="absolute inset-0 rounded-md bg-card border border-border shadow-sm"
+                    transition={{ type: "spring", bounce: 0.15, duration: 0.5 }}
+                  />
+                )}
+                <span className="relative z-10">{r.label}</span>
+              </button>
+            ))}
+          </div>
+          {range === "custom" && (
+            <div className="flex flex-wrap items-center gap-2 p-2 rounded-lg bg-secondary border border-border">
+              <Label className="text-xs text-muted-foreground shrink-0">С</Label>
+              <Input
+                type="date"
+                value={customDateFrom}
+                onChange={(e) => setCustomDateFrom(e.target.value)}
+                className="h-8 w-[140px] bg-card border-border text-sm"
+              />
+              <Label className="text-xs text-muted-foreground shrink-0">по</Label>
+              <Input
+                type="date"
+                value={customDateTo}
+                onChange={(e) => setCustomDateTo(e.target.value)}
+                className="h-8 w-[140px] bg-card border-border text-sm"
+              />
+            </div>
+          )}
         </div>
 
         {/* Period Total — mobile: stack, desktop: row */}
@@ -421,7 +547,268 @@ export default function ExpensesPage() {
           )}
         </AnimatePresence>
 
-        {/* List */}
+        {/* Charts view */}
+        {viewMode === "charts" && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="flex flex-col gap-6"
+          >
+            {/* Сводка за период */}
+            <div className="rounded-xl border border-border bg-card p-4 shadow-[var(--shadow-card)] grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <div>
+                <p className="text-xs text-muted-foreground">Итого за период</p>
+                <p className="text-lg font-bold text-foreground">{formatUZS(periodTotal)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">В среднем в день</p>
+                <p className="text-lg font-bold text-foreground">
+                  {chartData.spendingByDay.length > 0
+                    ? formatUZS(Math.round(periodTotal / chartData.spendingByDay.length))
+                    : "—"}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Операций</p>
+                <p className="text-lg font-bold text-foreground">{expenses.length}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Дней с расходами</p>
+                <p className="text-lg font-bold text-foreground">{chartData.spendingByDay.length}</p>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+              <p className="text-sm font-medium text-foreground mb-4">Расходы по дням</p>
+              <div className="h-56">
+                {chartData.spendingByDay.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={chartData.spendingByDay} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
+                      <XAxis
+                        dataKey="day"
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fill: "var(--color-muted-foreground)", fontSize: 10 }}
+                      />
+                      <YAxis
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fill: "var(--color-muted-foreground)", fontSize: 11 }}
+                        tickFormatter={(v) => formatUZSShort(v)}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "var(--color-card)",
+                          border: "1px solid var(--color-border)",
+                          borderRadius: "8px",
+                          color: "var(--color-foreground)",
+                          fontSize: "12px",
+                        }}
+                        formatter={(value: number) => [formatUZSShort(value), "Расход"]}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="amount"
+                        stroke="var(--color-primary)"
+                        strokeWidth={2}
+                        dot={{ fill: "var(--color-primary)", r: 3 }}
+                        activeDot={{ r: 4 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-6">Нет данных за период</p>
+                )}
+              </div>
+            </div>
+
+            {/* По дням и категориям (stacked) */}
+            {chartData.dailyByCategory.length > 0 && chartData.catNames.length > 0 && (
+              <div className="rounded-xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+                <p className="text-sm font-medium text-foreground mb-4">По дням по категориям</p>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartData.dailyByCategory} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
+                      <XAxis
+                        dataKey="day"
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fill: "var(--color-muted-foreground)", fontSize: 10 }}
+                      />
+                      <YAxis
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fill: "var(--color-muted-foreground)", fontSize: 11 }}
+                        tickFormatter={(v) => formatUZSShort(v)}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "var(--color-card)",
+                          border: "1px solid var(--color-border)",
+                          borderRadius: "8px",
+                          color: "var(--color-foreground)",
+                          fontSize: "12px",
+                        }}
+                        formatter={(value: number) => [formatUZSShort(Number(value)), ""]}
+                        content={({ active, payload, label }) => {
+                          if (!active || !payload?.length) return null
+                          const total = payload.reduce((s, p) => s + Number(p.value ?? 0), 0)
+                          return (
+                            <div className="rounded-lg border border-border bg-card p-3 shadow-sm text-sm">
+                              <p className="font-medium text-foreground mb-1">{label}</p>
+                              {payload.filter((p) => Number(p.value) > 0).map((p) => (
+                                <p key={p.name} className="text-muted-foreground">
+                                  {p.name}: {formatUZSShort(Number(p.value))}
+                                </p>
+                              ))}
+                              <p className="text-foreground font-medium mt-1">Итого: {formatUZSShort(total)}</p>
+                            </div>
+                          )
+                        }}
+                      />
+                      {chartData.catNames.map((name) => (
+                        <Bar
+                          key={name}
+                          dataKey={name}
+                          stackId="day"
+                          fill={chartData.categoryColors[name] ?? "var(--color-muted)"}
+                          radius={[0, 0, 0, 0]}
+                        />
+                      ))}
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="rounded-xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+                <p className="text-sm font-medium text-foreground mb-4">По категориям</p>
+                <div className="h-64">
+                  {chartData.categoryBreakdown.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={chartData.categoryBreakdown}
+                          dataKey="value"
+                          nameKey="name"
+                          cx="50%"
+                          cy="50%"
+                          outerRadius={80}
+                          label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                        >
+                          {chartData.categoryBreakdown.map((_, index) => (
+                            <Cell key={index} fill={chartData.categoryBreakdown[index].fill} />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: "var(--color-card)",
+                            border: "1px solid var(--color-border)",
+                            borderRadius: "8px",
+                            color: "var(--color-foreground)",
+                            fontSize: "12px",
+                          }}
+                          formatter={(value: number) => [formatUZSShort(value), "Сумма"]}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <p className="text-sm text-muted-foreground text-center py-6">Нет данных за период</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+                <p className="text-sm font-medium text-foreground mb-4">По способу оплаты</p>
+                <div className="h-64">
+                  {chartData.paymentBreakdown.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={chartData.paymentBreakdown}
+                          dataKey="value"
+                          nameKey="name"
+                          cx="50%"
+                          cy="50%"
+                          outerRadius={80}
+                          label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                        >
+                          {chartData.paymentBreakdown.map((_, index) => (
+                            <Cell key={index} fill={chartData.paymentBreakdown[index].fill} />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: "var(--color-card)",
+                            border: "1px solid var(--color-border)",
+                            borderRadius: "8px",
+                            color: "var(--color-foreground)",
+                            fontSize: "12px",
+                          }}
+                          formatter={(value: number) => [formatUZSShort(value), "Сумма"]}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <p className="text-sm text-muted-foreground text-center py-6">Нет данных за период</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+              <p className="text-sm font-medium text-foreground mb-4">Топ-10 мерчантов</p>
+              <div className="h-72 min-h-[220px]">
+                {chartData.topMerchants.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={chartData.topMerchants}
+                      layout="vertical"
+                      margin={{ top: 4, right: 4, left: 0, bottom: 0 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" horizontal={false} />
+                      <XAxis
+                        type="number"
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fill: "var(--color-muted-foreground)", fontSize: 11 }}
+                        tickFormatter={(v) => formatUZSShort(v)}
+                      />
+                      <YAxis
+                        type="category"
+                        dataKey="name"
+                        width={100}
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fill: "var(--color-muted-foreground)", fontSize: 10 }}
+                        tickFormatter={(v) => (v.length > 14 ? v.slice(0, 12) + "…" : v)}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "var(--color-card)",
+                          border: "1px solid var(--color-border)",
+                          borderRadius: "8px",
+                          color: "var(--color-foreground)",
+                          fontSize: "12px",
+                        }}
+                        formatter={(value: number) => [formatUZSShort(value), "Сумма"]}
+                      />
+                      <Bar dataKey="value" fill="var(--color-chart-1)" radius={[0, 4, 4, 0]} barSize={20} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-6">Нет данных за период</p>
+                )}
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* List (cards or table) */}
+        {viewMode !== "charts" && (
         <AnimatePresence mode="wait">
           {viewMode === "cards" ? (
             <motion.div
@@ -655,6 +1042,7 @@ export default function ExpensesPage() {
             </motion.div>
           )}
         </AnimatePresence>
+        )}
       </div>
 
       {/* Detail popup (mobile / row click) */}
