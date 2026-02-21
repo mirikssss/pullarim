@@ -3,7 +3,7 @@
 import { useState } from "react"
 import useSWR from "swr"
 import { motion, AnimatePresence } from "framer-motion"
-import { Mic, Check, X, Loader2 } from "lucide-react"
+import { Mic, Check, X, Loader2, CreditCard, Banknote } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -24,6 +24,7 @@ export default function AddPage() {
   const [category, setCategory] = useState("")
   const [date, setDate] = useState(() => todayISO())
   const [note, setNote] = useState("")
+  const [paymentMethod, setPaymentMethod] = useState<"card" | "cash">("card")
   const [isRecording, setIsRecording] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -48,6 +49,7 @@ export default function AddPage() {
           amount: Number(amount),
           date,
           note: note || null,
+          payment_method: paymentMethod,
         }),
       })
       if (!res.ok) throw new Error(await res.text())
@@ -57,6 +59,7 @@ export default function AddPage() {
       setCategory("")
       setDate(todayISO())
       setNote("")
+      setPaymentMethod("card")
     } catch {
       // TODO: toast
     } finally {
@@ -135,6 +138,37 @@ export default function AddPage() {
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          {/* Payment method */}
+          <div className="flex flex-col gap-2">
+            <Label className="text-sm text-muted-foreground">Способ оплаты</Label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setPaymentMethod("card")}
+                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border text-sm font-medium transition-colors ${
+                  paymentMethod === "card"
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-border bg-secondary text-muted-foreground"
+                }`}
+              >
+                <CreditCard className="w-4 h-4" />
+                Карта
+              </button>
+              <button
+                type="button"
+                onClick={() => setPaymentMethod("cash")}
+                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg border text-sm font-medium transition-colors ${
+                  paymentMethod === "cash"
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-border bg-secondary text-muted-foreground"
+                }`}
+              >
+                <Banknote className="w-4 h-4" />
+                Наличные
+              </button>
+            </div>
           </div>
 
           {/* Note */}

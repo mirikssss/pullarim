@@ -174,6 +174,8 @@ export async function POST(request: NextRequest) {
   let inserted = 0
   let skipped = 0
   const skippedRows: { reason: string; count: number }[] = []
+  const { ensureAccounts, createExpenseLedger } = await import("@/lib/ledger")
+  const accounts = await ensureAccounts(supabase, user.id)
 
   for (const row of rows) {
     const catExists = await categoryExists(supabase, row.category_id)
@@ -182,18 +184,23 @@ export async function POST(request: NextRequest) {
       continue
     }
 
-    const { error } = await supabase.from("expenses").insert({
-      user_id: user.id,
-      merchant: row.merchant.slice(0, 120),
-      category_id: row.category_id,
-      amount: row.amount,
-      date: row.date,
-      note: row.note || null,
-      external_source: "payme",
-      external_id: row.external_id,
-      exclude_from_budget: row.exclude_from_budget,
-      source_type: row.source_type,
-    })
+    const { data: insertedRow, error } = await supabase
+      .from("expenses")
+      .insert({
+        user_id: user.id,
+        merchant: row.merchant.slice(0, 120),
+        category_id: row.category_id,
+        amount: row.amount,
+        date: row.date,
+        note: row.note || null,
+        external_source: "payme",
+        external_id: row.external_id,
+        exclude_from_budget: row.exclude_from_budget,
+        source_type: row.source_type,
+        payment_method: "card",
+      })
+      .select("id, amount, date, merchant, note, payment_method")
+      .single()
 
     if (error) {
       if (error.code === "23505") {
@@ -201,7 +208,19 @@ export async function POST(request: NextRequest) {
       } else {
         return NextResponse.json({ error: error.message }, { status: 500 })
       }
-    } else {
+    } else if (insertedRow) {
+      if (accounts && !row.exclude_from_budget) {
+        await createExpenseLedger(supabase, {
+          id: insertedRow.id,
+          user_id: user.id,
+          amount: insertedRow.amount,
+          date: insertedRow.date,
+          merchant: insertedRow.merchant,
+          note: insertedRow.note,
+          payment_method: insertedRow.payment_method ?? "card",
+          exclude_from_budget: row.exclude_from_budget,
+        })
+      }
       inserted++
     }
   }

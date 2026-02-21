@@ -75,6 +75,23 @@ export async function POST(request: NextRequest) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
+  if (data && data.received) {
+    const { ensureAccounts, createSalaryIncomeLedger, hasLedgerEntryForPayment } = await import("@/lib/ledger")
+    const supabase2 = await createClient()
+    const accounts = await ensureAccounts(supabase2, user.id)
+    if (accounts) {
+      const hasEntry = await hasLedgerEntryForPayment(supabase2, data.id)
+      if (!hasEntry) {
+        await createSalaryIncomeLedger(supabase2, {
+          id: data.id,
+          user_id: data.user_id,
+          pay_date: data.pay_date,
+          amount: data.amount,
+          received: true,
+        })
+      }
+    }
+  }
   return NextResponse.json(data)
 }
 
@@ -103,6 +120,11 @@ export async function PATCH(request: NextRequest) {
   if (amount != null) updates.amount = amount
 
   const supabase = await createClient()
+  let prevReceived: boolean | undefined
+  if (updates.received !== undefined) {
+    const { data: prev } = await supabase.from("payments").select("received").eq("id", id).eq("user_id", user.id).single()
+    prevReceived = prev?.received
+  }
   const { data, error } = await supabase
     .from("payments")
     .update(updates)
@@ -113,6 +135,23 @@ export async function PATCH(request: NextRequest) {
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+  const becameReceived = data?.received && prevReceived === false
+  if (data && becameReceived) {
+    const { ensureAccounts, createSalaryIncomeLedger, hasLedgerEntryForPayment } = await import("@/lib/ledger")
+    const accounts = await ensureAccounts(supabase, user.id)
+    if (accounts) {
+      const hasEntry = await hasLedgerEntryForPayment(supabase, data.id)
+      if (!hasEntry) {
+        await createSalaryIncomeLedger(supabase, {
+          id: data.id,
+          user_id: data.user_id,
+          pay_date: data.pay_date,
+          amount: data.amount,
+          received: true,
+        })
+      }
+    }
   }
   return NextResponse.json(data)
 }

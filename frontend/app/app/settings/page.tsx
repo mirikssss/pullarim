@@ -3,13 +3,15 @@
 import { useState } from "react"
 import useSWR from "swr"
 import { motion } from "framer-motion"
-import { Download, Trash2, LogOut, ChevronRight, Pencil, Loader2 } from "lucide-react"
+import { Download, Trash2, LogOut, ChevronRight, Pencil, Loader2, Wallet } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { createClient } from "@/lib/supabase/client"
-import { fetcher, profileKey } from "@/lib/api"
+import { fetcher, profileKey, accountsKey } from "@/lib/api"
+import { formatUZS } from "@/lib/formatters"
+import type { Account } from "@/lib/types"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -48,6 +50,16 @@ export default function SettingsPage() {
   const [exporting, setExporting] = useState(false)
   const [deletingExpenses, setDeletingExpenses] = useState(false)
   const [deleteAllDialogOpen, setDeleteAllDialogOpen] = useState(false)
+  const [balanceDialogOpen, setBalanceDialogOpen] = useState(false)
+  const [balancePassword, setBalancePassword] = useState("")
+  const [balanceCard, setBalanceCard] = useState("")
+  const [balanceCash, setBalanceCash] = useState("")
+  const [balanceSaving, setBalanceSaving] = useState(false)
+  const [balanceError, setBalanceError] = useState("")
+  const { data: accountsData, mutate: mutateAccounts } = useSWR<{ accounts: Account[] }>(accountsKey(), fetcher)
+  const accounts = accountsData?.accounts ?? []
+  const cardAccount = accounts.find((a) => a.type === "card")
+  const cashAccount = accounts.find((a) => a.type === "cash")
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -111,6 +123,51 @@ export default function SettingsPage() {
     }
   }
 
+  const openBalanceDialog = () => {
+    setBalanceError("")
+    setBalancePassword("")
+    setBalanceCard(cardAccount != null ? String(cardAccount.opening_balance) : "0")
+    setBalanceCash(cashAccount != null ? String(cashAccount.opening_balance) : "0")
+    setBalanceDialogOpen(true)
+  }
+
+  const saveBalance = async () => {
+    setBalanceError("")
+    if (!balancePassword.trim()) {
+      setBalanceError("Введите пароль")
+      return
+    }
+    const cardNum = parseInt(balanceCard, 10)
+    const cashNum = parseInt(balanceCash, 10)
+    if (Number.isNaN(cardNum) || Number.isNaN(cashNum)) {
+      setBalanceError("Введите числа")
+      return
+    }
+    setBalanceSaving(true)
+    try {
+      const res = await fetch("/api/accounts/update-balance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          password: balancePassword,
+          opening_balance_card: cardNum,
+          opening_balance_cash: cashNum,
+        }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setBalanceError(data?.error ?? "Ошибка")
+        return
+      }
+      mutateAccounts()
+      setBalanceDialogOpen(false)
+    } catch {
+      setBalanceError("Ошибка сети")
+    } finally {
+      setBalanceSaving(false)
+    }
+  }
+
   const isDev = process.env.NODE_ENV === "development"
   const fullName = profile?.full_name ?? "Пользователь"
   const initials = fullName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()
@@ -154,6 +211,30 @@ export default function SettingsPage() {
             <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
           </button>
         </motion.div>
+
+        {/* Balance */}
+        {accounts.length > 0 && (
+          <motion.div variants={fadeUp} className="rounded-xl border border-border bg-card overflow-hidden shadow-[var(--shadow-card)]">
+            <div className="px-4 py-3 border-b border-border">
+              <p className="text-sm font-medium text-foreground">Начальный баланс</p>
+            </div>
+            <button
+              onClick={openBalanceDialog}
+              className="flex items-center gap-3 w-full px-4 py-3.5 border-b border-border hover:bg-secondary/50 transition-colors text-left"
+            >
+              <div className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center">
+                <Wallet className="w-4 h-4 text-muted-foreground" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-foreground">Изменить баланс на старт</p>
+                <p className="text-xs text-muted-foreground">
+                  Карта: {formatUZS(cardAccount?.opening_balance ?? 0)} · Наличные: {formatUZS(cashAccount?.opening_balance ?? 0)}
+                </p>
+              </div>
+              <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+            </button>
+          </motion.div>
+        )}
 
         {/* Preferences - only real options */}
         <motion.div variants={fadeUp} className="rounded-xl border border-border bg-card overflow-hidden shadow-[var(--shadow-card)]">
@@ -272,6 +353,73 @@ export default function SettingsPage() {
           </Button>
         </motion.div>
       </motion.div>
+
+      {/* Edit Balance Dialog */}
+      <Dialog open={balanceDialogOpen} onOpenChange={setBalanceDialogOpen}>
+        <DialogContent className="bg-card border-border max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">Изменить начальный баланс</DialogTitle>
+          </DialogHeader>
+          <p className="text-xs text-muted-foreground">
+            Баланс на старт (до 20.02 движения не минусуются). Для смены введите пароль от аккаунта.
+          </p>
+          <div className="flex flex-col gap-4 py-2">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="balance-password" className="text-sm text-muted-foreground">Пароль</Label>
+              <Input
+                id="balance-password"
+                type="password"
+                value={balancePassword}
+                onChange={(e) => setBalancePassword(e.target.value)}
+                placeholder="Пароль от аккаунта"
+                className="bg-secondary border-border"
+                autoComplete="current-password"
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="balance-card" className="text-sm text-muted-foreground">Карта (на старт)</Label>
+              <Input
+                id="balance-card"
+                type="number"
+                inputMode="numeric"
+                value={balanceCard}
+                onChange={(e) => setBalanceCard(e.target.value)}
+                className="bg-secondary border-border"
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="balance-cash" className="text-sm text-muted-foreground">Наличные (на старт)</Label>
+              <Input
+                id="balance-cash"
+                type="number"
+                inputMode="numeric"
+                value={balanceCash}
+                onChange={(e) => setBalanceCash(e.target.value)}
+                className="bg-secondary border-border"
+              />
+            </div>
+            {balanceError && (
+              <p className="text-sm text-destructive">{balanceError}</p>
+            )}
+          </div>
+          <DialogFooter className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setBalanceDialogOpen(false)}
+              className="border-border text-foreground"
+            >
+              Отмена
+            </Button>
+            <Button
+              onClick={saveBalance}
+              disabled={balanceSaving}
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
+            >
+              {balanceSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : "Сохранить"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Edit Profile Dialog */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>

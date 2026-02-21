@@ -18,7 +18,42 @@ export interface Expense {
   note?: string | null
   exclude_from_budget?: boolean
   source_type?: string | null
+  payment_method?: "card" | "cash" | null
   created_at?: string
+}
+
+export interface Account {
+  id: string
+  type: "card" | "cash"
+  name: string
+  opening_balance: number
+  computed_balance: number
+  created_at?: string
+}
+
+export interface LedgerEntry {
+  id: string
+  account_id: string
+  account_type: string | null
+  account_name: string | null
+  direction: "in" | "out"
+  amount: number
+  occurred_on: string
+  source_type: string
+  source_label: string
+  merchant: string | null
+  note: string | null
+  created_at: string
+}
+
+export interface Transfer {
+  id: string
+  from_account_id: string
+  to_account_id: string
+  amount: number
+  date: string
+  note: string | null
+  created_at: string
 }
 
 export interface SalaryMode {

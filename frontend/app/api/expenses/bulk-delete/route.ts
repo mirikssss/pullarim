@@ -35,5 +35,9 @@ export async function POST(request: NextRequest) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
+  const { deleteExpenseLedger } = await import("@/lib/ledger")
+  for (const id of ids) {
+    await deleteExpenseLedger(supabase, user.id, id)
+  }
   return NextResponse.json({ deleted: data?.length ?? 0 })
 }

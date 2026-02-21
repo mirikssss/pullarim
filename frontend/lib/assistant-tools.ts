@@ -683,11 +683,25 @@ export async function runTool(name: string, args: Record<string, unknown>): Prom
           amount,
           date,
           note,
+          payment_method: "card",
         })
         .select("*, category:categories(id, label, color)")
         .single()
 
       if (error) return { ok: false, error: error.message }
+      const { ensureAccounts, createExpenseLedger } = await import("@/lib/ledger")
+      const accounts = await ensureAccounts(supabase, user.id)
+      if (accounts) {
+        await createExpenseLedger(supabase, {
+          id: data.id,
+          user_id: user.id,
+          amount: data.amount,
+          date: data.date,
+          merchant: data.merchant,
+          note: data.note,
+          payment_method: data.payment_method ?? "card",
+        })
+      }
       return {
         ok: true,
         data: {

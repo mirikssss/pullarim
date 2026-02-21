@@ -53,3 +53,28 @@ export function salaryIncomeSummaryKey(from?: string, to?: string) {
   const q = params.toString()
   return `${API}/salary/income-summary${q ? `?${q}` : ""}`
 }
+
+export function accountsKey() {
+  return `${API}/accounts`
+}
+
+export function ledgerKey(account?: string, from?: string, to?: string) {
+  const params = new URLSearchParams()
+  if (account) params.set("account", account)
+  if (from) params.set("from", from)
+  if (to) params.set("to", to)
+  const q = params.toString()
+  return `${API}/ledger${q ? `?${q}` : ""}`
+}
+
+export function balanceSummaryKey(range?: string) {
+  return `${API}/balance/summary${range ? `?range=${range}` : ""}`
+}
+
+export function transfersKey(from?: string, to?: string) {
+  const params = new URLSearchParams()
+  if (from) params.set("from", from)
+  if (to) params.set("to", to)
+  const q = params.toString()
+  return `${API}/transfers${q ? `?${q}` : ""}`
+}

@@ -31,9 +31,21 @@ export async function PATCH(
       { status: 400 }
     )
   }
-  const { merchant, category_id, amount, date, note, exclude_from_budget } = parsed.data
+  const { merchant, category_id, amount, date, note, exclude_from_budget, payment_method } = parsed.data
 
   const supabase = await createClient()
+
+  const { data: before } = await supabase
+    .from("expenses")
+    .select("merchant, category_id, amount, date, note, payment_method, exclude_from_budget")
+    .eq("id", id)
+    .eq("user_id", user.id)
+    .single()
+  if (!before) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 })
+  }
+  const beforeId = id
+
   if (category_id !== undefined) {
     const exists = await categoryExists(supabase, category_id)
     if (!exists) {
@@ -44,18 +56,6 @@ export async function PATCH(
     }
   }
 
-  // Fetch current expense for learning loop (need merchant when category changes)
-  let currentMerchant: string | undefined
-  if (category_id !== undefined) {
-    const { data: existing } = await supabase
-      .from("expenses")
-      .select("merchant")
-      .eq("id", id)
-      .eq("user_id", user.id)
-      .single()
-    currentMerchant = existing?.merchant
-  }
-
   const updates: Record<string, unknown> = {}
   if (merchant !== undefined) updates.merchant = merchant
   if (category_id !== undefined) updates.category_id = category_id
@@ -63,6 +63,7 @@ export async function PATCH(
   if (date !== undefined) updates.date = date
   if (note !== undefined) updates.note = note
   if (exclude_from_budget !== undefined) updates.exclude_from_budget = exclude_from_budget
+  if (payment_method !== undefined) updates.payment_method = payment_method
 
   const { data, error } = await supabase
     .from("expenses")
@@ -79,8 +80,37 @@ export async function PATCH(
     return NextResponse.json({ error: "Not found" }, { status: 404 })
   }
 
+  const { ensureAccounts, updateExpenseLedger } = await import("@/lib/ledger")
+  const accounts = await ensureAccounts(supabase, user.id)
+  if (accounts) {
+    const afterRow = {
+      id: data.id,
+      user_id: user.id,
+      amount: data.amount,
+      date: data.date,
+      merchant: data.merchant,
+      note: data.note,
+      payment_method: data.payment_method ?? "card",
+      exclude_from_budget: data.exclude_from_budget ?? false,
+    }
+    const beforeRow = {
+      id: beforeId,
+      user_id: user.id,
+      amount: before.amount,
+      date: before.date,
+      merchant: before.merchant,
+      note: before.note,
+      payment_method: before.payment_method ?? "card",
+      exclude_from_budget: before.exclude_from_budget ?? false,
+    }
+    const ledgerErr = await updateExpenseLedger(supabase, beforeRow, afterRow)
+    if (ledgerErr.error) {
+      return NextResponse.json({ error: ledgerErr.error }, { status: 500 })
+    }
+  }
+
   // Learning loop: when user edits category or exclude_from_budget, save to merchant memory
-  const finalMerchant = (merchant ?? currentMerchant ?? data.merchant) as string
+  const finalMerchant = (merchant ?? before?.merchant ?? data.merchant) as string
   const finalCategoryId = category_id ?? data.category_id
   const m = normalizeMerchant(finalMerchant)
   if (m && (category_id !== undefined || exclude_from_budget !== undefined)) {
@@ -111,5 +141,9 @@ export async function DELETE(
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
+
+  const { deleteExpenseLedger } = await import("@/lib/ledger")
+  await deleteExpenseLedger(supabase, user.id, id)
+
   return NextResponse.json({ success: true })
 }

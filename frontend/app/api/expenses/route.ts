@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
       { status: 400 }
     )
   }
-  const { merchant, category_id, amount, date, note } = parsed.data
+  const { merchant, category_id, amount, date, note, payment_method } = parsed.data
 
   const supabase = await createClient()
   const exists = await categoryExists(supabase, category_id)
@@ -117,6 +117,7 @@ export async function POST(request: NextRequest) {
       note: note ?? null,
       exclude_from_budget: false,
       source_type: "manual",
+      payment_method: payment_method ?? "card",
     })
     .select("*, category:categories(id, label, color)")
     .single()
@@ -124,5 +125,24 @@ export async function POST(request: NextRequest) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
+
+  const { ensureAccounts, createExpenseLedger } = await import("@/lib/ledger")
+  const accounts = await ensureAccounts(supabase, user.id)
+  if (accounts && !data.exclude_from_budget) {
+    const ledgerErr = await createExpenseLedger(supabase, {
+      id: data.id,
+      user_id: user.id,
+      amount: data.amount,
+      date: data.date,
+      merchant: data.merchant,
+      note: data.note,
+      payment_method: data.payment_method ?? "card",
+      exclude_from_budget: data.exclude_from_budget ?? false,
+    })
+    if (ledgerErr.error) {
+      return NextResponse.json({ error: ledgerErr.error }, { status: 500 })
+    }
+  }
+
   return NextResponse.json(data)
 }

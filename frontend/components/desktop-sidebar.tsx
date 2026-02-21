@@ -6,6 +6,7 @@ import useSWR from "swr"
 import {
   LayoutDashboard,
   Banknote,
+  Wallet,
   PlusCircle,
   Receipt,
   MessageCircle,
@@ -17,6 +18,7 @@ import { fetcher, profileKey } from "@/lib/api"
 
 const NAV_ITEMS = [
   { href: "/app/dashboard", label: "Главная", icon: LayoutDashboard },
+  { href: "/app/balance", label: "Балансы", icon: Wallet },
   { href: "/app/salary", label: "Зарплата", icon: Banknote },
   { href: "/app/add", label: "Добавить", icon: PlusCircle },
   { href: "/app/expenses", label: "Расходы", icon: Receipt },

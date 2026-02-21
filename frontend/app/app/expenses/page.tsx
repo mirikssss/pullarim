@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect, Fragment } from "react"
 import useSWR from "swr"
 import { motion, AnimatePresence } from "framer-motion"
-import { LayoutGrid, List, ChevronDown, Plus, Search, X, Download, Upload, Pencil, Trash2, Loader2, CheckSquare, Square } from "lucide-react"
+import { LayoutGrid, List, ChevronDown, Plus, Search, X, Download, Upload, Pencil, Trash2, Loader2, CheckSquare, Square, Banknote } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -63,6 +63,12 @@ function getCategoryLabel(categories: Category[], id: string) {
 
 function getCategoryColor(categories: Category[], id: string) {
   return categories.find((c) => c.id === id)?.color ?? "bg-muted"
+}
+
+function canConvertToWithdrawal(expense: Expense): boolean {
+  const isUzcash = /uzcash/i.test((expense.merchant ?? "").trim())
+  const isTransferExcluded = expense.category_id === "transfers" && expense.exclude_from_budget
+  return isUzcash || !!isTransferExcluded
 }
 
 /** Group expenses by date for table view */
@@ -125,7 +131,7 @@ export default function ExpensesPage() {
     }
   }, [expenses, selectedIds.size])
 
-  const handleSaveEdit = useCallback(async (payload: { merchant: string; category_id: string; amount: number; date: string; note: string | null; exclude_from_budget?: boolean }) => {
+  const handleSaveEdit = useCallback(async (payload: { merchant: string; category_id: string; amount: number; date: string; note: string | null; exclude_from_budget?: boolean; payment_method?: "card" | "cash" }) => {
     if (!editExpense) return
     setSaving(true)
     try {
@@ -158,6 +164,26 @@ export default function ExpensesPage() {
       setDeleting(false)
     }
   }, [deleteExpense, mutate])
+
+  const [convertingId, setConvertingId] = useState<string | null>(null)
+  const handleConvertToWithdrawal = useCallback(
+    async (expense: Expense) => {
+      if (!canConvertToWithdrawal(expense)) return
+      setConvertingId(expense.id)
+      try {
+        const res = await fetch(`/api/expenses/${expense.id}/convert-to-withdrawal`, { method: "POST" })
+        if (!res.ok) throw new Error(await res.text())
+        setEditExpense(null)
+        setDetailExpense(null)
+        mutate()
+      } catch {
+        // TODO: toast
+      } finally {
+        setConvertingId(null)
+      }
+    },
+    [mutate]
+  )
 
   const handleBulkDelete = useCallback(async () => {
     if (selectedIds.size === 0) return
@@ -469,6 +495,21 @@ export default function ExpensesPage() {
                         <div className="flex flex-col items-end gap-1">
                           <span className="text-sm font-semibold text-foreground whitespace-nowrap">{formatUZS(expense.amount)}</span>
                           <div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
+                            {canConvertToWithdrawal(expense) && (
+                              <button
+                                onClick={() => handleConvertToWithdrawal(expense)}
+                                disabled={convertingId === expense.id}
+                                className="min-w-[36px] min-h-[36px] flex items-center justify-center rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+                                aria-label="Преобразовать в снятие наличных"
+                                title="Снятие наличных"
+                              >
+                                {convertingId === expense.id ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <Banknote className="w-4 h-4" />
+                                )}
+                              </button>
+                            )}
                             <button
                               onClick={() => setEditExpense(expense)}
                               className="min-w-[36px] min-h-[36px] flex items-center justify-center rounded-lg hover:bg-secondary active:bg-secondary/80 text-muted-foreground hover:text-foreground transition-colors"
@@ -566,6 +607,21 @@ export default function ExpensesPage() {
                             <td className="px-4 py-3 text-right font-medium text-foreground">{formatUZS(expense.amount)}</td>
                             <td className="px-2 py-3" onClick={(e) => e.stopPropagation()}>
                               <div className="flex items-center justify-end gap-0.5">
+                                {canConvertToWithdrawal(expense) && (
+                                  <button
+                                    onClick={() => handleConvertToWithdrawal(expense)}
+                                    disabled={convertingId === expense.id}
+                                    className="p-1.5 rounded hover:bg-secondary text-muted-foreground hover:text-foreground disabled:opacity-50"
+                                    aria-label="Преобразовать в снятие наличных"
+                                    title="Снятие наличных"
+                                  >
+                                    {convertingId === expense.id ? (
+                                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                    ) : (
+                                      <Banknote className="w-3.5 h-3.5" />
+                                    )}
+                                  </button>
+                                )}
                                 <button
                                   onClick={() => setEditExpense(expense)}
                                   className="p-1.5 rounded hover:bg-secondary text-muted-foreground hover:text-foreground"
@@ -814,7 +870,7 @@ function ExpenseEditDialog({
   expense: Expense | null
   categories: Category[]
   onClose: () => void
-  onSave: (p: { merchant: string; category_id: string; amount: number; date: string; note: string | null; exclude_from_budget?: boolean }) => void
+  onSave: (p: { merchant: string; category_id: string; amount: number; date: string; note: string | null; exclude_from_budget?: boolean; payment_method?: "card" | "cash" }) => void
   saving: boolean
 }) {
   const [merchant, setMerchant] = useState("")
@@ -823,6 +879,7 @@ function ExpenseEditDialog({
   const [date, setDate] = useState("")
   const [note, setNote] = useState("")
   const [includeInBudget, setIncludeInBudget] = useState(true)
+  const [paymentMethod, setPaymentMethod] = useState<"card" | "cash">("card")
   const [confirmOpen, setConfirmOpen] = useState(false)
 
   const open = !!expense
@@ -834,6 +891,7 @@ function ExpenseEditDialog({
       setDate(expense.date)
       setNote(expense.note ?? "")
       setIncludeInBudget(!expense.exclude_from_budget)
+      setPaymentMethod(expense.payment_method === "cash" ? "cash" : "card")
     } else {
       setMerchant("")
       setCategoryId("")
@@ -841,6 +899,7 @@ function ExpenseEditDialog({
       setDate("")
       setNote("")
       setIncludeInBudget(true)
+      setPaymentMethod("card")
     }
   }, [expense])
 
@@ -851,6 +910,7 @@ function ExpenseEditDialog({
     setDate("")
     setNote("")
     setIncludeInBudget(true)
+    setPaymentMethod("card")
     setConfirmOpen(false)
   }
 
@@ -877,6 +937,7 @@ function ExpenseEditDialog({
       date: date || new Date().toISOString().slice(0, 10),
       note: note.trim() || null,
       exclude_from_budget: !includeInBudget,
+      payment_method: paymentMethod,
     })
     reset()
     onClose()
@@ -899,6 +960,29 @@ function ExpenseEditDialog({
                 className="bg-secondary border-border"
                 required
               />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label className="text-sm text-muted-foreground">Способ оплаты</Label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod("card")}
+                  className={`flex-1 py-2 rounded-lg border text-sm font-medium ${
+                    paymentMethod === "card" ? "border-primary bg-primary/10 text-primary" : "border-border bg-secondary text-muted-foreground"
+                  }`}
+                >
+                  Карта
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod("cash")}
+                  className={`flex-1 py-2 rounded-lg border text-sm font-medium ${
+                    paymentMethod === "cash" ? "border-primary bg-primary/10 text-primary" : "border-border bg-secondary text-muted-foreground"
+                  }`}
+                >
+                  Наличные
+                </button>
+              </div>
             </div>
             <div className="flex items-center justify-between gap-2">
               <Label className="text-sm text-muted-foreground">Учитывать в бюджете</Label>

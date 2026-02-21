@@ -48,12 +48,15 @@ export const expensesGetQuerySchema = z.object({
   includeExcluded: z.coerce.number().optional(),
 })
 
+const paymentMethod = z.enum(["card", "cash"]).optional().default("card")
+
 export const expensesPostBodySchema = z.object({
   merchant: z.string().min(1, "merchant required").max(120).transform((s) => s.trim() || "Без названия"),
   category_id: z.string().min(1, "category_id required"),
   amount: z.number().int().positive("amount must be > 0"),
   date: dateStr.optional().default(() => new Date().toISOString().slice(0, 10)),
   note: z.string().max(500).nullable().optional(),
+  payment_method: paymentMethod,
 })
 
 export const expensesPatchBodySchema = z.object({
@@ -63,6 +66,7 @@ export const expensesPatchBodySchema = z.object({
   date: dateStr.optional(),
   note: z.string().max(500).nullable().optional(),
   exclude_from_budget: z.boolean().optional(),
+  payment_method: z.enum(["card", "cash"]).optional(),
 }).refine((data) => Object.keys(data).some((k) => data[k as keyof typeof data] !== undefined), {
   message: "No fields to update",
 })
@@ -151,6 +155,21 @@ export const forecastQuerySchema = z.object({
 export const incomeSummaryQuerySchema = z.object({
   from: dateStr.optional(),
   to: dateStr.optional(),
+})
+
+// --- Transfers ---
+export const transfersPostBodySchema = z.object({
+  from_account_id: uuid,
+  to_account_id: uuid,
+  amount: z.number().int().positive("amount must be > 0"),
+  date: dateStr,
+  note: z.string().max(500).nullable().optional(),
+})
+
+export const transfersGetQuerySchema = z.object({
+  from: dateStr.optional(),
+  to: dateStr.optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional().default(50),
 })
 
 // --- Profile ---

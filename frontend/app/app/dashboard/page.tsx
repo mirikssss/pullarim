@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { MONTHS_RU, formatUZS } from "@/lib/formatters"
 import { fetcher, expensesKey, salaryForecastKey, profileKey, salaryIncomeSummaryKey } from "@/lib/api"
 import { DashboardCards } from "@/components/dashboard/dashboard-cards"
+import { BalanceCards } from "@/components/dashboard/balance-cards"
 import { SpendingSummary } from "@/components/dashboard/spending-summary"
 import { SpendingChart } from "@/components/dashboard/spending-chart"
 import { CategoryChart } from "@/components/dashboard/category-chart"
@@ -145,6 +146,7 @@ export default function DashboardPage() {
         animate="show"
         className="flex flex-col gap-4 p-4"
       >
+        <BalanceCards fadeUp={fadeUp} />
         <SpendingSummary fadeUp={fadeUp} expenses={expenses} />
         {incomeSummary && (
           <motion.div
