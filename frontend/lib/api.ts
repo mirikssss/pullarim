@@ -12,7 +12,7 @@ export async function fetcher<T>(url: string): Promise<T> {
 }
 
 export function expensesKey(range: string, categoryId?: string, search?: string) {
-  const params = new URLSearchParams({ range })
+  const params = new URLSearchParams({ range, includeExcluded: "1" })
   if (categoryId && categoryId !== "all") params.set("category_id", categoryId)
   if (search) params.set("search", search)
   return `${API}/expenses?${params}`

@@ -74,7 +74,7 @@ async function callModel(
     messages: options.messages,
     tools: options.tools,
     tool_choice: options.tool_choice ?? (options.tools ? "auto" : undefined),
-    max_tokens: options.max_tokens ?? 2048,
+    max_tokens: options.max_tokens ?? 8192,
     temperature: options.temperature ?? 0.7,
   }
   const res = await fetch(OPENROUTER_URL, {
@@ -125,7 +125,7 @@ export async function callOpenRouter(options: CallOptions): Promise<CallResult> 
           const toolCalls = msg?.tool_calls?.map((tc) => ({
             id: tc.id,
             name: tc.function.name,
-            arguments: tc.function.arguments,
+            arguments: tc.function.arguments ?? "{}",
           }))
 
           let content: string | null = null

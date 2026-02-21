@@ -14,10 +14,15 @@ import { formatUZS } from "@/lib/formatters"
 import { fetcher, categoriesKey } from "@/lib/api"
 import type { Category } from "@/lib/types"
 
+function todayISO() {
+  return new Date().toISOString().slice(0, 10)
+}
+
 export default function AddPage() {
   const [amount, setAmount] = useState("")
   const [merchant, setMerchant] = useState("")
   const [category, setCategory] = useState("")
+  const [date, setDate] = useState(() => todayISO())
   const [note, setNote] = useState("")
   const [isRecording, setIsRecording] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
@@ -41,7 +46,7 @@ export default function AddPage() {
           merchant: merchant || "Без названия",
           category_id: category,
           amount: Number(amount),
-          date: new Date().toISOString().slice(0, 10),
+          date,
           note: note || null,
         }),
       })
@@ -50,6 +55,7 @@ export default function AddPage() {
       setAmount("")
       setMerchant("")
       setCategory("")
+      setDate(todayISO())
       setNote("")
     } catch {
       // TODO: toast
@@ -100,6 +106,18 @@ export default function AddPage() {
               placeholder="Например: Korzinka"
               value={merchant}
               onChange={(e) => setMerchant(e.target.value)}
+              className="bg-secondary border-border h-11"
+            />
+          </div>
+
+          {/* Date */}
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="date" className="text-sm text-muted-foreground">Дата</Label>
+            <Input
+              id="date"
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
               className="bg-secondary border-border h-11"
             />
           </div>
@@ -206,6 +224,12 @@ export default function AddPage() {
                 <span className="text-foreground">{merchant}</span>
               </div>
             )}
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Дата</span>
+              <span className="text-foreground">
+                {new Date(date + "T12:00:00").toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" })}
+              </span>
+            </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Категория</span>
               <span className="text-foreground">

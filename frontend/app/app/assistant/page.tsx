@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import ReactMarkdown from "react-markdown"
+import remarkGfm from "remark-gfm"
 import imageCompression from "browser-image-compression"
 import { Send, Paperclip, Bot, Loader2, X, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -259,8 +260,9 @@ export default function AssistantPage() {
               }`}
             >
               {msg.role === "assistant" ? (
-                <div className="[&_strong]:font-semibold [&_em]:italic [&_p]:my-1 [&_p:first-child]:mt-0 [&_p:last-child]:mb-0 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:list-inside [&_ol]:list-decimal [&_ol]:list-inside [&_h1]:text-base [&_h1]:font-semibold [&_h2]:text-sm [&_h2]:font-semibold [&_h3]:text-sm [&_h3]:font-medium">
+                <div className="[&_strong]:font-semibold [&_em]:italic [&_p]:my-1 [&_p:first-child]:mt-0 [&_p:last-child]:mb-0 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:list-inside [&_ol]:list-decimal [&_ol]:list-inside [&_h1]:text-base [&_h1]:font-semibold [&_h2]:text-sm [&_h2]:font-semibold [&_h3]:text-sm [&_h3]:font-medium [&_table]:w-full [&_table]:border-collapse [&_th]:border [&_th]:border-border [&_th]:px-2 [&_th]:py-1 [&_th]:text-left [&_th]:bg-muted [&_td]:border [&_td]:border-border [&_td]:px-2 [&_td]:py-1">
                   <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
                     components={{
                       p: ({ children }) => <p className="whitespace-pre-wrap">{children}</p>,
                       strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
@@ -270,6 +272,7 @@ export default function AssistantPage() {
                       h3: ({ children }) => <div className="text-sm font-medium mt-1.5 first:mt-0">{children}</div>,
                       ul: ({ children }) => <ul className="list-disc list-inside space-y-0.5">{children}</ul>,
                       ol: ({ children }) => <ol className="list-decimal list-inside space-y-0.5">{children}</ol>,
+                      table: ({ children }) => <div className="overflow-x-auto my-2"><table className="w-full text-sm">{children}</table></div>,
                     }}
                   >
                     {typeof msg.content === "string" ? msg.content : ""}
