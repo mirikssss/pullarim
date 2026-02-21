@@ -26,7 +26,7 @@ export async function POST(
   }
 
   const norm = normalizeMerchant(expense.merchant ?? "")
-  const isUzcash = /uzcash/i.test(norm || expense.merchant ?? "")
+  const isUzcash = /uzcash/i.test(norm || (expense.merchant ?? ""))
   const isTransferExcluded =
     expense.category_id === "transfers" && expense.exclude_from_budget
   if (!isUzcash && !isTransferExcluded) {

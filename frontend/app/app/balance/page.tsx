@@ -1,9 +1,8 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, Suspense, Fragment } from "react"
 import useSWR from "swr"
 import { useSearchParams } from "next/navigation"
-import { Fragment } from "react"
 import { CreditCard, Banknote, Wallet } from "lucide-react"
 import { formatUZS } from "@/lib/formatters"
 import { fetcher, accountsKey, ledgerKey, balanceSummaryKey } from "@/lib/api"
@@ -24,7 +23,7 @@ const RANGES = [
   { key: "30d" as const, label: "30 д" },
 ]
 
-export default function BalancePage() {
+function BalancePageContent() {
   const searchParams = useSearchParams()
   const accountParam = searchParams.get("account") ?? "all"
   const tabKey = accountParam === "cash" ? "cash" : accountParam === "card" ? "card" : "all"
@@ -226,5 +225,13 @@ export default function BalancePage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function BalancePage() {
+  return (
+    <Suspense fallback={<div className="max-w-4xl mx-auto p-4"><div className="h-14" /><div className="animate-pulse rounded-xl bg-secondary h-32 mb-4" /><div className="animate-pulse rounded-xl bg-secondary h-64" /></div>}>
+      <BalancePageContent />
+    </Suspense>
   )
 }
