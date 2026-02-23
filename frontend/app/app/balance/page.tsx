@@ -3,8 +3,9 @@
 import { useState, useMemo, Suspense, Fragment } from "react"
 import useSWR from "swr"
 import { useSearchParams } from "next/navigation"
-import { CreditCard, Banknote, Wallet } from "lucide-react"
+import { CreditCard, Banknote, Wallet, ArrowDownRight, ArrowUpRight } from "lucide-react"
 import { formatUZS } from "@/lib/formatters"
+import { AnimatedNumber } from "@/components/ui/animated-number"
 import { fetcher, accountsKey, ledgerKey, balanceSummaryKey } from "@/lib/api"
 import type { Account, LedgerEntry } from "@/lib/types"
 
@@ -119,19 +120,39 @@ function BalancePageContent() {
           })}
         </div>
 
-        {/* Balances */}
-        <div className="grid grid-cols-3 gap-2">
+        {/* Balances: на мобилке одна карточка (как в референсе), на md+ — три */}
+        <div className="md:hidden">
+          <div className="rounded-xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+            <p className="text-xs text-muted-foreground mb-1">
+              {tabKey === "card" ? "Карта" : tabKey === "cash" ? "Наличные" : "Всего"}
+            </p>
+            <p className="text-2xl font-extrabold tabular-nums text-foreground whitespace-nowrap overflow-hidden text-ellipsis min-w-0">
+              <AnimatedNumber
+                value={tabKey === "card" ? (card?.computed_balance ?? 0) : tabKey === "cash" ? (cash?.computed_balance ?? 0) : total}
+                format={formatUZS}
+                duration={800}
+              />
+            </p>
+          </div>
+        </div>
+        <div className="hidden md:grid md:grid-cols-3 gap-2">
           <div className="rounded-xl border border-border bg-card p-3">
             <p className="text-xs text-muted-foreground mb-0.5">Карта</p>
-            <p className="text-lg font-bold text-foreground">{formatUZS(card?.computed_balance ?? 0)}</p>
+            <p className="text-xl font-extrabold tabular-nums text-foreground whitespace-nowrap overflow-hidden text-ellipsis min-w-0">
+              <AnimatedNumber value={card?.computed_balance ?? 0} format={formatUZS} duration={800} />
+            </p>
           </div>
           <div className="rounded-xl border border-border bg-card p-3">
             <p className="text-xs text-muted-foreground mb-0.5">Наличные</p>
-            <p className="text-lg font-bold text-foreground">{formatUZS(cash?.computed_balance ?? 0)}</p>
+            <p className="text-xl font-extrabold tabular-nums text-foreground whitespace-nowrap overflow-hidden text-ellipsis min-w-0">
+              <AnimatedNumber value={cash?.computed_balance ?? 0} format={formatUZS} duration={800} />
+            </p>
           </div>
           <div className="rounded-xl border border-border bg-card p-3">
             <p className="text-xs text-muted-foreground mb-0.5">Всего</p>
-            <p className="text-lg font-bold text-foreground">{formatUZS(total)}</p>
+            <p className="text-xl font-extrabold tabular-nums text-foreground whitespace-nowrap overflow-hidden text-ellipsis min-w-0">
+              <AnimatedNumber value={total} format={formatUZS} duration={800} delay={100} />
+            </p>
           </div>
         </div>
 
@@ -157,7 +178,9 @@ function BalancePageContent() {
               {topMerchants.slice(0, 5).map((m: { merchant: string; amount: number }, i: number) => (
                 <div key={i} className="flex justify-between text-sm">
                   <span className="text-foreground truncate pr-2">{m.merchant}</span>
-                  <span className="text-foreground font-medium shrink-0">{formatUZS(m.amount)}</span>
+                  <span className="text-foreground font-semibold tabular-nums shrink-0">
+                    <AnimatedNumber value={m.amount} format={formatUZS} duration={600} delay={i * 50} />
+                  </span>
                 </div>
               ))}
             </div>
@@ -168,17 +191,70 @@ function BalancePageContent() {
               {byCategory.slice(0, 5).map((c: { category_id: string; amount: number }, i: number) => (
                 <div key={i} className="flex justify-between text-sm">
                   <span className="text-foreground">{c.category_id}</span>
-                  <span className="text-foreground font-medium">{formatUZS(c.amount)}</span>
+                  <span className="text-foreground font-semibold tabular-nums">
+                    <AnimatedNumber value={c.amount} format={formatUZS} duration={600} delay={i * 50} />
+                  </span>
                 </div>
               ))}
             </div>
           )}
         </div>
 
-        {/* Ledger table — по дням, начиная с 20 февраля */}
+        {/* Движения: на мобилке — список карточек (как в референсе), на md+ — таблица */}
         <div className="rounded-xl border border-border bg-card overflow-hidden">
           <p className="text-sm font-semibold text-foreground p-4 pb-2">Движения (с 20 февраля)</p>
-          <div className="overflow-x-auto">
+
+          {/* Мобильный список — карточки по одной транзакции */}
+          <div className="md:hidden space-y-3 px-4 pb-4">
+            {entries.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">Нет движений с 20 февраля</p>
+            ) : (
+              entriesByDay.map(({ date, items }) => (
+                <div key={date} className="space-y-2">
+                  <p className="text-xs font-semibold text-muted-foreground">{formatDayLabel(date)}</p>
+                  {items.map((e) => (
+                    <div
+                      key={e.id}
+                      className="flex items-center gap-3 rounded-xl border border-border bg-secondary/30 p-3"
+                    >
+                      <div
+                        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
+                          e.direction === "in"
+                            ? "bg-green-500/15 text-green-600 dark:text-green-400"
+                            : "bg-secondary text-muted-foreground"
+                        }`}
+                      >
+                        {e.direction === "in" ? (
+                          <ArrowUpRight className="w-5 h-5" />
+                        ) : (
+                          <ArrowDownRight className="w-5 h-5" />
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-foreground truncate">
+                          {e.merchant || e.note || "—"}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {e.source_label}
+                          {e.account_type === "card" ? " · Карта" : e.account_type === "cash" ? " · Наличные" : ""}
+                        </p>
+                      </div>
+                      <span
+                        className={`shrink-0 text-sm tabular-nums font-semibold ${
+                          e.direction === "in" ? "text-green-600 dark:text-green-400" : "text-foreground"
+                        }`}
+                      >
+                        {e.direction === "in" ? "+" : "−"} {formatUZS(e.amount)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Десктоп: таблица */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-left text-muted-foreground">
@@ -202,8 +278,8 @@ function BalancePageContent() {
                         <td className="px-4 py-2 text-foreground truncate max-w-[140px]">
                           {e.merchant || e.note || "—"}
                         </td>
-                        <td className="px-4 py-2 text-right">
-                          <span className={e.direction === "in" ? "text-green-600 dark:text-green-400" : "text-foreground"}>
+                        <td className="px-4 py-2 text-right whitespace-nowrap">
+                          <span className={`tabular-nums font-semibold ${e.direction === "in" ? "text-green-600 dark:text-green-400" : "text-foreground"}`}>
                             {e.direction === "in" ? "+" : "−"} {formatUZS(e.amount)}
                           </span>
                         </td>
@@ -220,7 +296,7 @@ function BalancePageContent() {
             </table>
           </div>
           {entries.length === 0 && (
-            <p className="text-sm text-muted-foreground text-center py-8">Нет движений с 20 февраля</p>
+            <p className="hidden md:block text-sm text-muted-foreground text-center py-8">Нет движений с 20 февраля</p>
           )}
         </div>
       </div>

@@ -3,7 +3,7 @@
 import { useState } from "react"
 import useSWR from "swr"
 import { motion } from "framer-motion"
-import { Download, Trash2, LogOut, ChevronRight, Pencil, Loader2, Wallet } from "lucide-react"
+import { Download, Trash2, LogOut, ChevronRight, Pencil, Loader2, Wallet, Lock } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -56,6 +56,12 @@ export default function SettingsPage() {
   const [balanceCash, setBalanceCash] = useState("")
   const [balanceSaving, setBalanceSaving] = useState(false)
   const [balanceError, setBalanceError] = useState("")
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false)
+  const [currentPassword, setCurrentPassword] = useState("")
+  const [newPassword, setNewPassword] = useState("")
+  const [newPasswordConfirm, setNewPasswordConfirm] = useState("")
+  const [passwordSaving, setPasswordSaving] = useState(false)
+  const [passwordError, setPasswordError] = useState("")
   const { data: accountsData, mutate: mutateAccounts } = useSWR<{ accounts: Account[] }>(accountsKey(), fetcher)
   const accounts = accountsData?.accounts ?? []
   const cardAccount = accounts.find((a) => a.type === "card")
@@ -168,6 +174,60 @@ export default function SettingsPage() {
     }
   }
 
+  const openPasswordDialog = () => {
+    setPasswordError("")
+    setCurrentPassword("")
+    setNewPassword("")
+    setNewPasswordConfirm("")
+    setPasswordDialogOpen(true)
+  }
+
+  const changePassword = async () => {
+    setPasswordError("")
+    if (!currentPassword.trim()) {
+      setPasswordError("Введите текущий пароль")
+      return
+    }
+    if (!newPassword.trim()) {
+      setPasswordError("Введите новый пароль")
+      return
+    }
+    if (newPassword.length < 6) {
+      setPasswordError("Новый пароль не менее 6 символов")
+      return
+    }
+    if (newPassword !== newPasswordConfirm) {
+      setPasswordError("Новый пароль и подтверждение не совпадают")
+      return
+    }
+    const userEmail = (profile as { email?: string })?.email
+    if (!userEmail) {
+      setPasswordError("Email не найден")
+      return
+    }
+    setPasswordSaving(true)
+    try {
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: userEmail,
+        password: currentPassword,
+      })
+      if (signInError) {
+        setPasswordError("Неверный текущий пароль")
+        return
+      }
+      const { error: updateError } = await supabase.auth.updateUser({ password: newPassword })
+      if (updateError) {
+        setPasswordError(updateError.message ?? "Не удалось изменить пароль")
+        return
+      }
+      setPasswordDialogOpen(false)
+    } catch {
+      setPasswordError("Ошибка сети")
+    } finally {
+      setPasswordSaving(false)
+    }
+  }
+
   const isDev = process.env.NODE_ENV === "development"
   const fullName = profile?.full_name ?? "Пользователь"
   const initials = fullName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()
@@ -255,6 +315,26 @@ export default function SettingsPage() {
             </div>
             <span className="text-xs text-muted-foreground bg-secondary px-2 py-1 rounded">Фиксировано</span>
           </div>
+        </motion.div>
+
+        {/* Security - change password */}
+        <motion.div variants={fadeUp} className="rounded-xl border border-border bg-card overflow-hidden shadow-[var(--shadow-card)]">
+          <div className="px-4 py-3 border-b border-border">
+            <p className="text-sm font-medium text-foreground">Безопасность</p>
+          </div>
+          <button
+            onClick={openPasswordDialog}
+            className="flex items-center gap-3 w-full px-4 py-3.5 hover:bg-secondary/50 transition-colors text-left"
+          >
+            <div className="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center">
+              <Lock className="w-4 h-4 text-muted-foreground" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm text-foreground">Изменить пароль</p>
+              <p className="text-xs text-muted-foreground">Установите новый пароль для входа</p>
+            </div>
+            <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+          </button>
         </motion.div>
 
         {/* Data Section */}
@@ -416,6 +496,75 @@ export default function SettingsPage() {
               className="bg-primary text-primary-foreground hover:bg-primary/90"
             >
               {balanceSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : "Сохранить"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Change Password Dialog */}
+      <Dialog open={passwordDialogOpen} onOpenChange={setPasswordDialogOpen}>
+        <DialogContent className="bg-card border-border max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">Изменить пароль</DialogTitle>
+          </DialogHeader>
+          <p className="text-xs text-muted-foreground">
+            Введите текущий пароль и новый пароль (не менее 6 символов).
+          </p>
+          <div className="flex flex-col gap-4 py-2">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="current-password" className="text-sm text-muted-foreground">Текущий пароль</Label>
+              <Input
+                id="current-password"
+                type="password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                placeholder="••••••••"
+                className="bg-secondary border-border"
+                autoComplete="current-password"
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="new-password" className="text-sm text-muted-foreground">Новый пароль</Label>
+              <Input
+                id="new-password"
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="••••••••"
+                className="bg-secondary border-border"
+                autoComplete="new-password"
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="new-password-confirm" className="text-sm text-muted-foreground">Подтвердите новый пароль</Label>
+              <Input
+                id="new-password-confirm"
+                type="password"
+                value={newPasswordConfirm}
+                onChange={(e) => setNewPasswordConfirm(e.target.value)}
+                placeholder="••••••••"
+                className="bg-secondary border-border"
+                autoComplete="new-password"
+              />
+            </div>
+            {passwordError && (
+              <p className="text-sm text-destructive">{passwordError}</p>
+            )}
+          </div>
+          <DialogFooter className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setPasswordDialogOpen(false)}
+              className="border-border text-foreground"
+            >
+              Отмена
+            </Button>
+            <Button
+              onClick={changePassword}
+              disabled={passwordSaving}
+              className="bg-primary text-primary-foreground hover:bg-primary/90"
+            >
+              {passwordSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : "Сохранить"}
             </Button>
           </DialogFooter>
         </DialogContent>

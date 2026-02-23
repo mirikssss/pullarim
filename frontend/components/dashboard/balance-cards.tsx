@@ -34,7 +34,7 @@ export function BalanceCards({ fadeUp }: Props) {
             <CreditCard className="w-3.5 h-3.5 text-muted-foreground" />
             <span className="text-xs text-muted-foreground">Карта</span>
           </div>
-          <p className="text-base font-bold text-foreground truncate">
+          <p className="text-base font-bold tabular-nums text-foreground whitespace-nowrap overflow-hidden text-ellipsis min-w-0">
             {formatUZS(card?.computed_balance ?? 0)}
           </p>
         </motion.div>
@@ -48,7 +48,7 @@ export function BalanceCards({ fadeUp }: Props) {
             <Banknote className="w-3.5 h-3.5 text-muted-foreground" />
             <span className="text-xs text-muted-foreground">Наличные</span>
           </div>
-          <p className="text-base font-bold text-foreground truncate">
+          <p className="text-base font-bold tabular-nums text-foreground whitespace-nowrap overflow-hidden text-ellipsis min-w-0">
             {formatUZS(cash?.computed_balance ?? 0)}
           </p>
         </motion.div>
@@ -62,7 +62,7 @@ export function BalanceCards({ fadeUp }: Props) {
             <Wallet className="w-3.5 h-3.5 text-muted-foreground" />
             <span className="text-xs text-muted-foreground">Всего</span>
           </div>
-          <p className="text-base font-bold text-foreground truncate">
+          <p className="text-base font-bold tabular-nums text-foreground whitespace-nowrap overflow-hidden text-ellipsis min-w-0">
             {formatUZS(total)}
           </p>
         </motion.div>

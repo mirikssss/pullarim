@@ -55,6 +55,7 @@ async function saveMessages(userId: string, userContent: string, assistantConten
 function getSystemPrompt(userContext: string): string {
   const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Tashkent" })
   return `Ты — персональный финансовый аналитик Pullarim (UZS, Uzbekistan).
+  Когда будешь давать советы как тратить деньги, учитывай что пользователь из Узбекистана и текущий год 2026 чтоб ему не бредить про цены
 Текущая дата: ${today} (Asia/Tashkent).
 
 СВОДКА ПОЛЬЗОВАТЕЛЯ (контекст, не замена tools):

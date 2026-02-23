@@ -48,6 +48,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { formatUZS, formatUZSShort } from "@/lib/formatters"
+import { AnimatedNumber } from "@/components/ui/animated-number"
 import { fetcher, expensesKey, categoriesKey } from "@/lib/api"
 import type { Expense, Category } from "@/lib/types"
 import Link from "next/link"
@@ -406,7 +407,9 @@ export default function ExpensesPage() {
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
             <p className="text-xs text-muted-foreground">Итого за период</p>
-            <p className="text-xl font-bold text-foreground">{formatUZS(periodTotal)}</p>
+            <p className="text-2xl sm:text-3xl font-extrabold tabular-nums text-foreground">
+              <AnimatedNumber value={periodTotal} format={formatUZS} duration={800} />
+            </p>
             <p className="text-xs text-muted-foreground mt-0.5">{expenses.length} расходов</p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
@@ -558,23 +561,36 @@ export default function ExpensesPage() {
             <div className="rounded-xl border border-border bg-card p-4 shadow-[var(--shadow-card)] grid grid-cols-2 sm:grid-cols-4 gap-4">
               <div>
                 <p className="text-xs text-muted-foreground">Итого за период</p>
-                <p className="text-lg font-bold text-foreground">{formatUZS(periodTotal)}</p>
+                <p className="text-xl sm:text-2xl font-extrabold tabular-nums text-foreground">
+                  <AnimatedNumber value={periodTotal} format={formatUZS} duration={700} />
+                </p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">В среднем в день</p>
-                <p className="text-lg font-bold text-foreground">
-                  {chartData.spendingByDay.length > 0
-                    ? formatUZS(Math.round(periodTotal / chartData.spendingByDay.length))
-                    : "—"}
+                <p className="text-xl sm:text-2xl font-extrabold tabular-nums text-foreground">
+                  {chartData.spendingByDay.length > 0 ? (
+                    <AnimatedNumber
+                      value={Math.round(periodTotal / chartData.spendingByDay.length)}
+                      format={formatUZS}
+                      duration={700}
+                      delay={80}
+                    />
+                  ) : (
+                    "—"
+                  )}
                 </p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Операций</p>
-                <p className="text-lg font-bold text-foreground">{expenses.length}</p>
+                <p className="text-xl sm:text-2xl font-extrabold tabular-nums text-foreground">
+                  <AnimatedNumber value={expenses.length} integer duration={600} delay={120} />
+                </p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Дней с расходами</p>
-                <p className="text-lg font-bold text-foreground">{chartData.spendingByDay.length}</p>
+                <p className="text-xl sm:text-2xl font-extrabold tabular-nums text-foreground">
+                  <AnimatedNumber value={chartData.spendingByDay.length} integer duration={600} delay={160} />
+                </p>
               </div>
             </div>
 
@@ -589,12 +605,12 @@ export default function ExpensesPage() {
                         dataKey="day"
                         axisLine={false}
                         tickLine={false}
-                        tick={{ fill: "var(--color-muted-foreground)", fontSize: 10 }}
+                        tick={{ fill: "var(--color-muted-foreground)", fontSize: 12, fontWeight: 600 }}
                       />
                       <YAxis
                         axisLine={false}
                         tickLine={false}
-                        tick={{ fill: "var(--color-muted-foreground)", fontSize: 11 }}
+                        tick={{ fill: "var(--color-muted-foreground)", fontSize: 13, fontWeight: 600 }}
                         tickFormatter={(v) => formatUZSShort(v)}
                       />
                       <Tooltip
@@ -635,12 +651,12 @@ export default function ExpensesPage() {
                         dataKey="day"
                         axisLine={false}
                         tickLine={false}
-                        tick={{ fill: "var(--color-muted-foreground)", fontSize: 10 }}
+                        tick={{ fill: "var(--color-muted-foreground)", fontSize: 12, fontWeight: 600 }}
                       />
                       <YAxis
                         axisLine={false}
                         tickLine={false}
-                        tick={{ fill: "var(--color-muted-foreground)", fontSize: 11 }}
+                        tick={{ fill: "var(--color-muted-foreground)", fontSize: 13, fontWeight: 600 }}
                         tickFormatter={(v) => formatUZSShort(v)}
                       />
                       <Tooltip
@@ -774,7 +790,7 @@ export default function ExpensesPage() {
                         type="number"
                         axisLine={false}
                         tickLine={false}
-                        tick={{ fill: "var(--color-muted-foreground)", fontSize: 11 }}
+                        tick={{ fill: "var(--color-muted-foreground)", fontSize: 13, fontWeight: 600 }}
                         tickFormatter={(v) => formatUZSShort(v)}
                       />
                       <YAxis
@@ -783,7 +799,7 @@ export default function ExpensesPage() {
                         width={100}
                         axisLine={false}
                         tickLine={false}
-                        tick={{ fill: "var(--color-muted-foreground)", fontSize: 10 }}
+                        tick={{ fill: "var(--color-muted-foreground)", fontSize: 12, fontWeight: 600 }}
                         tickFormatter={(v) => (v.length > 14 ? v.slice(0, 12) + "…" : v)}
                       />
                       <Tooltip
