@@ -183,16 +183,34 @@ export async function POST(request: NextRequest) {
     })
   }
 
+  const externalIds = rows.map((r) => r.external_id)
+  const { data: existingExpenses } = await supabase
+    .from("expenses")
+    .select("external_id")
+    .eq("user_id", user.id)
+    .eq("external_source", "payme")
+    .in("external_id", externalIds)
+  const existingExternalIds = new Set((existingExpenses ?? []).map((e: { external_id: string }) => e.external_id))
+
+  const duplicate_rows: { merchant: string; amount: number; date: string; note: string; category_id: string }[] = []
   let inserted = 0
-  let skipped = 0
-  const skippedRows: { reason: string; count: number }[] = []
   const { ensureAccounts, createExpenseLedger } = await import("@/lib/ledger")
   const accounts = await ensureAccounts(supabase, user.id)
 
   for (const row of rows) {
+    if (existingExternalIds.has(row.external_id)) {
+      duplicate_rows.push({
+        merchant: row.merchant,
+        amount: row.amount,
+        date: row.date,
+        note: row.note ?? "",
+        category_id: row.category_id,
+      })
+      continue
+    }
+
     const catExists = await categoryExists(supabase, row.category_id)
     if (!catExists) {
-      skipped++
       continue
     }
 
@@ -216,11 +234,19 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       if (error.code === "23505") {
-        skipped++
+        duplicate_rows.push({
+          merchant: row.merchant,
+          amount: row.amount,
+          date: row.date,
+          note: row.note ?? "",
+          category_id: row.category_id,
+        })
+        existingExternalIds.add(row.external_id)
       } else {
         return NextResponse.json({ error: error.message }, { status: 500 })
       }
     } else if (insertedRow) {
+      existingExternalIds.add(row.external_id)
       if (accounts && !row.exclude_from_budget) {
         await createExpenseLedger(supabase, {
           id: insertedRow.id,
@@ -239,8 +265,8 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({
     count_inserted: inserted,
-    count_skipped_duplicates: skipped,
+    count_skipped_duplicates: duplicate_rows.length,
     total: rows.length,
-    skipped_rows: skippedRows,
+    duplicate_rows,
   })
 }

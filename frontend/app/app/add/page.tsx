@@ -30,17 +30,20 @@ export default function AddPage() {
   const [showConfirm, setShowConfirm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({})
+  const [duplicateExisting, setDuplicateExisting] = useState<{ id: string; merchant: string; date: string; amount: number } | null>(null)
 
   const { data: categories = [] } = useSWR<Category[]>(categoriesKey(), fetcher)
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!amount || !category) return
+    setDuplicateExisting(null)
     setShowConfirm(true)
   }
 
-  const handleConfirm = async () => {
+  const handleConfirm = async (forceDuplicate?: boolean) => {
     setSaving(true)
+    setDuplicateExisting(null)
     try {
       const res = await fetch("/api/expenses", {
         method: "POST",
@@ -52,8 +55,17 @@ export default function AddPage() {
           date,
           note: note || null,
           payment_method: paymentMethod,
+          ...(forceDuplicate && { force_duplicate: true }),
         }),
       })
+      if (res.status === 409) {
+        const data = await res.json().catch(() => ({}))
+        if (data.duplicate && data.existing) {
+          setDuplicateExisting(data.existing)
+          setSaving(false)
+          return
+        }
+      }
       if (!res.ok) {
         const { message, fieldErrors: errFields } = await parseErrorResponse(res)
         setFieldErrors(errFields ?? {})
@@ -63,6 +75,7 @@ export default function AddPage() {
       setFieldErrors({})
       toast.success("Расход добавлен")
       setShowConfirm(false)
+      setDuplicateExisting(null)
       setAmount("")
       setMerchant("")
       setCategory("")
@@ -254,58 +267,88 @@ export default function AddPage() {
         </form>
       </motion.div>
 
-      {/* Confirmation Dialog */}
-      <Dialog open={showConfirm} onOpenChange={setShowConfirm}>
+      {/* Confirmation / Duplicate Dialog */}
+      <Dialog
+        open={showConfirm}
+        onOpenChange={(open) => {
+          setShowConfirm(open)
+          if (!open) setDuplicateExisting(null)
+        }}
+      >
         <DialogContent className="bg-card border-border max-w-sm">
           <DialogHeader>
-            <DialogTitle className="text-foreground">Подтвердите расход</DialogTitle>
+            <DialogTitle className="text-foreground">
+              {duplicateExisting ? "Похожий расход уже есть" : "Подтвердите расход"}
+            </DialogTitle>
           </DialogHeader>
-          <div className="flex flex-col gap-3 py-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Сумма</span>
-              <span className="font-semibold text-foreground">{formatUZS(Number(amount) || 0)}</span>
-            </div>
-            {merchant && (
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Название</span>
-                <span className="text-foreground">{merchant}</span>
+          {duplicateExisting ? (
+            <div className="flex flex-col gap-3 py-2">
+              <p className="text-sm text-muted-foreground">
+                Уже есть расход с той же датой, суммой и названием:
+              </p>
+              <div className="rounded-lg bg-secondary/50 p-3 text-sm">
+                <div className="font-medium text-foreground">{duplicateExisting.merchant}</div>
+                <div className="text-muted-foreground">
+                  {formatUZS(duplicateExisting.amount)} · {new Date(duplicateExisting.date + "T12:00:00").toLocaleDateString("ru-RU", { day: "numeric", month: "short", year: "numeric" })}
+                </div>
               </div>
-            )}
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Дата</span>
-              <span className="text-foreground">
-                {new Date(date + "T12:00:00").toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" })}
-              </span>
+              <p className="text-xs text-muted-foreground">
+                Добавить ещё один такой же расход?
+              </p>
             </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Категория</span>
-              <span className="text-foreground">
-                {categories.find((c) => c.id === category)?.label || category}
-              </span>
-            </div>
-            {note && (
+          ) : (
+            <div className="flex flex-col gap-3 py-2">
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Заметка</span>
-                <span className="text-foreground truncate max-w-[180px]">{note}</span>
+                <span className="text-muted-foreground">Сумма</span>
+                <span className="font-semibold text-foreground">{formatUZS(Number(amount) || 0)}</span>
               </div>
-            )}
-          </div>
+              {merchant && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Название</span>
+                  <span className="text-foreground">{merchant}</span>
+                </div>
+              )}
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Дата</span>
+                <span className="text-foreground">
+                  {new Date(date + "T12:00:00").toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" })}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Категория</span>
+                <span className="text-foreground">
+                  {categories.find((c) => c.id === category)?.label || category}
+                </span>
+              </div>
+              {note && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Заметка</span>
+                  <span className="text-foreground truncate max-w-[180px]">{note}</span>
+                </div>
+              )}
+            </div>
+          )}
           <DialogFooter className="flex gap-2">
             <Button
               variant="outline"
-              onClick={() => setShowConfirm(false)}
+              onClick={() => { setShowConfirm(false); setDuplicateExisting(null) }}
               className="flex-1 border-border text-foreground"
             >
               <X className="w-4 h-4 mr-1.5" />
-              Отмена
+              {duplicateExisting ? "Отмена" : "Отмена"}
             </Button>
             <Button
-              onClick={handleConfirm}
+              onClick={() => duplicateExisting ? handleConfirm(true) : handleConfirm()}
               disabled={saving}
               className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90"
             >
               {saving ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
+              ) : duplicateExisting ? (
+                <>
+                  <Check className="w-4 h-4 mr-1.5" />
+                  Добавить всё равно
+                </>
               ) : (
                 <>
                   <Check className="w-4 h-4 mr-1.5" />

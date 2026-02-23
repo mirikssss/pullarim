@@ -7,6 +7,7 @@ import { Upload, FileSpreadsheet, CheckCircle, Loader2, ArrowRight, ArrowLeft, R
 import { Button } from "@/components/ui/button"
 import { fetcher, categoriesKey } from "@/lib/api"
 import type { Category } from "@/lib/types"
+import { toast } from "sonner"
 import { formatUZS } from "@/lib/formatters"
 import Link from "next/link"
 
@@ -35,7 +36,10 @@ export default function ImportPage() {
     count_inserted: number
     count_skipped_duplicates: number
     total: number
+    duplicate_rows?: { merchant: string; amount: number; date: string; note: string; category_id: string }[]
   } | null>(null)
+  const [addedDuplicateIndices, setAddedDuplicateIndices] = useState<Set<number>>(new Set())
+  const [addingDuplicateIndex, setAddingDuplicateIndex] = useState<number | null>(null)
   const [importOnlySpisanie, setImportOnlySpisanie] = useState(true)
   const [previewTotal, setPreviewTotal] = useState(0)
   const [previewTotalSpend, setPreviewTotalSpend] = useState(0)
@@ -116,6 +120,7 @@ export default function ImportPage() {
       }
       const data = await res.json()
       setResult(data)
+      setAddedDuplicateIndices(new Set())
       setStep("result")
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ошибка")
@@ -298,20 +303,90 @@ export default function ImportPage() {
       )
     }
     if (step === "result" && result) {
+      const duplicateRows = result.duplicate_rows ?? []
+      const handleAddDuplicate = async (index: number) => {
+        const row = duplicateRows[index]
+        if (!row) return
+        setAddingDuplicateIndex(index)
+        try {
+          const res = await fetch("/api/expenses", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              merchant: row.merchant,
+              amount: row.amount,
+              date: row.date,
+              note: row.note || null,
+              category_id: row.category_id,
+              payment_method: "card" as const,
+              force_duplicate: true,
+            }),
+          })
+          if (res.ok) {
+            setAddedDuplicateIndices((prev) => new Set(prev).add(index))
+            toast.success(`Добавлено: ${row.merchant} — ${formatUZS(row.amount)}`)
+          } else {
+            const data = await res.json().catch(() => ({}))
+            toast.error(data?.error?.message ?? "Ошибка")
+          }
+        } catch {
+          toast.error("Ошибка сети")
+        } finally {
+          setAddingDuplicateIndex(null)
+        }
+      }
+
       return (
         <motion.div
           key="result"
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex flex-col gap-4 items-center py-8"
+          className="flex flex-col gap-6 items-center py-8 max-w-lg mx-auto"
         >
           <CheckCircle className="w-16 h-16 text-primary" />
           <h2 className="text-lg font-semibold text-foreground">Импорт завершён</h2>
           <div className="text-center text-sm text-muted-foreground space-y-1">
             <p>Добавлено: <span className="font-medium text-foreground">{result.count_inserted}</span></p>
-            <p>Пропущено (дубликаты): <span className="font-medium text-foreground">{result.count_skipped_duplicates}</span></p>
+            {result.count_skipped_duplicates > 0 && (
+              <p>Пропущено (дубликаты): <span className="font-medium text-foreground">{result.count_skipped_duplicates}</span></p>
+            )}
             <p>Всего обработано: <span className="font-medium text-foreground">{result.total}</span></p>
           </div>
+
+          {duplicateRows.length > 0 && (
+            <div className="w-full rounded-xl border border-border bg-card p-4">
+              <p className="text-sm font-medium text-foreground mb-2">Пропущены как дубликаты — можно добавить вручную</p>
+              <ul className="space-y-2 max-h-48 overflow-y-auto">
+                {duplicateRows.map((row, index) => (
+                  <li
+                    key={index}
+                    className="flex items-center justify-between gap-2 py-2 border-b border-border last:border-0 text-sm"
+                  >
+                    <div className="min-w-0">
+                      <span className="font-medium text-foreground truncate block">{row.merchant}</span>
+                      <span className="text-muted-foreground text-xs">
+                        {formatUZS(row.amount)} · {new Date(row.date + "T12:00:00").toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}
+                      </span>
+                    </div>
+                    {addedDuplicateIndices.has(index) ? (
+                      <span className="text-xs text-primary shrink-0">Добавлено</span>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="shrink-0"
+                        disabled={addingDuplicateIndex !== null}
+                        onClick={() => handleAddDuplicate(index)}
+                      >
+                        {addingDuplicateIndex === index ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Добавить вручную"}
+                      </Button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           <div className="flex gap-2">
             <Button
               variant="outline"
@@ -320,6 +395,7 @@ export default function ImportPage() {
                 setFile(null)
                 setPreviewRows([])
                 setResult(null)
+                setAddedDuplicateIndices(new Set())
               }}
             >
               Импортировать ещё

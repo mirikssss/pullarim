@@ -39,6 +39,10 @@ export function QuickAdd({ fadeUp, onSuccess }: Props) {
           date: new Date().toISOString().slice(0, 10),
         }),
       })
+      if (res.status === 409) {
+        toast.warning("Похожий расход уже есть (та же дата и сумма). Добавьте через «Новый расход», если нужно.")
+        return
+      }
       if (!res.ok) {
         const { message } = await parseErrorResponse(res)
         toast.error(message)
