@@ -62,14 +62,14 @@ export const ASSISTANT_TOOLS: ToolDefinition[] = [
     type: "function",
     function: {
       name: "get_spending_summary",
-      description: "Суммарные расходы за период (только учитываемые в бюджете; переводы и «не в бюджете» не включаются). Возвращает total, avg_per_day, max_day, min_day.",
+      description: "Суммарные расходы за период (только учитываемые в бюджете; переводы и «не в бюджете» не включаются). Возвращает total, avg_per_day, max_day, min_day. Для «последние 5 дней» используй range=5d.",
       parameters: {
         type: "object",
         properties: {
           range: {
             type: "string",
-            enum: ["today", "yesterday", "7d", "15d", "month"],
-            description: "today | yesterday | 7d | 15d | month",
+            enum: ["today", "yesterday", "5d", "7d", "15d", "month"],
+            description: "today | yesterday | 5d (последние 5 дней) | 7d | 15d | month",
           },
           month: { type: "string", description: "YYYY-MM для month (опционально)" },
         },
@@ -87,8 +87,8 @@ export const ASSISTANT_TOOLS: ToolDefinition[] = [
         properties: {
           range: {
             type: "string",
-            enum: ["today", "yesterday", "7d", "14d", "15d", "month", "custom"],
-            description: "today | yesterday | 7d | 14d | 15d | month | custom",
+            enum: ["today", "yesterday", "5d", "7d", "14d", "15d", "month", "custom"],
+            description: "today | yesterday | 5d (последние 5 дней) | 7d | 14d | 15d | month | custom",
           },
           from: { type: "string", description: "YYYY-MM-DD для custom" },
           to: { type: "string", description: "YYYY-MM-DD для custom" },
@@ -102,14 +102,14 @@ export const ASSISTANT_TOOLS: ToolDefinition[] = [
     type: "function",
     function: {
       name: "get_spending_by_category",
-      description: "Разбивка по категориям + top_merchants, outliers (топ-3 крупных). Только расходы, учитываемые в бюджете; переводы и «не в бюджете» не включаются.",
+      description: "Разбивка по категориям + top_merchants, outliers (топ-3 крупных). Только расходы, учитываемые в бюджете. Для «последние 5 дней» используй range=5d.",
       parameters: {
         type: "object",
         properties: {
           range: {
             type: "string",
-            enum: ["today", "yesterday", "7d", "15d", "month"],
-            description: "today | yesterday | 7d | 15d | month",
+            enum: ["today", "yesterday", "5d", "7d", "15d", "month"],
+            description: "today | yesterday | 5d (последние 5 дней) | 7d | 15d | month",
           },
           month: { type: "string", description: "YYYY-MM для month (опционально)" },
         },
@@ -242,6 +242,11 @@ export async function runTool(name: string, args: Record<string, unknown>): Prom
         const [y, m, day] = today.split("-").map(Number)
         const d = new Date(Date.UTC(y, m - 1, day - 1))
         date_from = date_to = d.toISOString().slice(0, 10)
+      } else if (range === "5d") {
+        const [y, m, day] = today.split("-").map(Number)
+        const d = new Date(Date.UTC(y, m - 1, day - 4))
+        date_from = d.toISOString().slice(0, 10)
+        date_to = today
       } else if (range === "7d") {
         const [y, m, day] = today.split("-").map(Number)
         const d = new Date(Date.UTC(y, m - 1, day - 6))
@@ -437,6 +442,11 @@ export async function runTool(name: string, args: Record<string, unknown>): Prom
         const [y, m, day] = today.split("-").map(Number)
         const d = new Date(Date.UTC(y, m - 1, day - 1))
         date_from = date_to = d.toISOString().slice(0, 10)
+      } else if (range === "5d") {
+        const [y, m, day] = today.split("-").map(Number)
+        const d = new Date(Date.UTC(y, m - 1, day - 4))
+        date_from = d.toISOString().slice(0, 10)
+        date_to = today
       } else if (range === "7d") {
         const [y, m, day] = today.split("-").map(Number)
         const d = new Date(Date.UTC(y, m - 1, day - 6))
@@ -510,6 +520,11 @@ export async function runTool(name: string, args: Record<string, unknown>): Prom
         const [y, m, day] = today.split("-").map(Number)
         const d = new Date(Date.UTC(y, m - 1, day - 1))
         date_from = date_to = d.toISOString().slice(0, 10)
+      } else if (range === "5d") {
+        const [y, m, day] = today.split("-").map(Number)
+        const d = new Date(Date.UTC(y, m - 1, day - 4))
+        date_from = d.toISOString().slice(0, 10)
+        date_to = today
       } else if (range === "7d") {
         const [y, m, day] = today.split("-").map(Number)
         const d = new Date(Date.UTC(y, m - 1, day - 6))
