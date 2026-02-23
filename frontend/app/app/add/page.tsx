@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import useSWR from "swr"
 import { motion, AnimatePresence } from "framer-motion"
@@ -35,6 +35,82 @@ export default function AddPage() {
 
   const router = useRouter()
   const { data: categories = [] } = useSWR<Category[]>(categoriesKey(), fetcher)
+
+  const recognitionRef = useRef<SpeechRecognition | null>(null)
+  const transcriptRef = useRef("")
+
+  useEffect(() => {
+    const SpeechRecognitionAPI =
+      typeof window !== "undefined"
+        ? (window.SpeechRecognition || (window as unknown as { webkitSpeechRecognition?: SpeechRecognition }).webkitSpeechRecognition)
+        : null
+    if (!SpeechRecognitionAPI || !isRecording) return
+
+    transcriptRef.current = ""
+    const rec = new SpeechRecognitionAPI() as SpeechRecognition
+    rec.continuous = true
+    rec.lang = "ru-RU"
+    rec.interimResults = true
+
+    rec.onresult = (e: SpeechRecognitionEvent) => {
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (e.results[i].isFinal) transcriptRef.current += " " + e.results[i][0].transcript
+      }
+    }
+
+    rec.onend = () => {
+      setIsRecording(false)
+      const text = transcriptRef.current.trim()
+      if (!text) return
+      fetch("/api/assistant/voice-parse", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      })
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.amount) {
+            setAmount(String(data.amount))
+            setMerchant(data.merchant ?? "")
+            setDate(data.date ?? todayISO())
+            setCategory(data.category_id ?? "")
+            setFieldErrors({})
+            toast.success("Заполнено по голосу")
+          } else {
+            toast.error(data.error?.message ?? "Не удалось разобрать фразу")
+          }
+        })
+        .catch(() => toast.error("Ошибка сети"))
+    }
+
+    rec.onerror = (e: SpeechRecognitionErrorEvent) => {
+      if (e.error !== "aborted") toast.error("Ошибка микрофона")
+      setIsRecording(false)
+    }
+
+    recognitionRef.current = rec
+    rec.start()
+
+    return () => {
+      try {
+        rec.abort()
+      } catch {
+        // ignore
+      }
+      recognitionRef.current = null
+    }
+  }, [isRecording])
+
+  const handleMicClick = () => {
+    const api = typeof window !== "undefined"
+      ? (window.SpeechRecognition || (window as unknown as { webkitSpeechRecognition?: SpeechRecognition }).webkitSpeechRecognition)
+      : null
+    if (!api) {
+      toast.error("Голосовой ввод не поддерживается в этом браузере. Попробуйте Chrome или Safari.")
+      return
+    }
+    setIsRecording((prev) => !prev)
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -217,7 +293,7 @@ export default function AddPage() {
             <motion.button
               type="button"
               whileTap={{ scale: 0.95 }}
-              onClick={() => setIsRecording(!isRecording)}
+              onClick={handleMicClick}
               className={`flex items-center justify-center w-16 h-16 rounded-full transition-colors shadow-sm ${
                 isRecording
                   ? "bg-destructive text-destructive-foreground"
