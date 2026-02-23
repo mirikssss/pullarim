@@ -59,7 +59,7 @@ export async function PATCH(request: NextRequest) {
       { status: 400 }
     )
   }
-  const { full_name, avatar_url } = parsed.data
+  const { full_name, avatar_url, monthly_budget } = parsed.data
 
   const supabase = await createClient()
   const { data, error } = await supabase
@@ -69,6 +69,7 @@ export async function PATCH(request: NextRequest) {
         id: user.id,
         ...(full_name !== undefined && { full_name }),
         ...(avatar_url !== undefined && { avatar_url }),
+        ...(monthly_budget !== undefined && { monthly_budget }),
       },
       { onConflict: "id" }
     )

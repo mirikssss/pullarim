@@ -10,8 +10,9 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { toast } from "sonner"
 import { formatUZS } from "@/lib/formatters"
-import { fetcher, categoriesKey } from "@/lib/api"
+import { fetcher, categoriesKey, parseErrorResponse } from "@/lib/api"
 import type { Category } from "@/lib/types"
 
 function todayISO() {
@@ -28,6 +29,7 @@ export default function AddPage() {
   const [isRecording, setIsRecording] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({})
 
   const { data: categories = [] } = useSWR<Category[]>(categoriesKey(), fetcher)
 
@@ -52,7 +54,14 @@ export default function AddPage() {
           payment_method: paymentMethod,
         }),
       })
-      if (!res.ok) throw new Error(await res.text())
+      if (!res.ok) {
+        const { message, fieldErrors: errFields } = await parseErrorResponse(res)
+        setFieldErrors(errFields ?? {})
+        toast.error(message)
+        return
+      }
+      setFieldErrors({})
+      toast.success("Расход добавлен")
       setShowConfirm(false)
       setAmount("")
       setMerchant("")
@@ -61,7 +70,7 @@ export default function AddPage() {
       setNote("")
       setPaymentMethod("card")
     } catch {
-      // TODO: toast
+      toast.error("Ошибка сети")
     } finally {
       setSaving(false)
     }
@@ -99,6 +108,7 @@ export default function AddPage() {
               />
               <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">сум</span>
             </div>
+            {fieldErrors.amount?.[0] && <p className="text-sm text-destructive">{fieldErrors.amount[0]}</p>}
           </div>
 
           {/* Merchant */}
@@ -111,6 +121,7 @@ export default function AddPage() {
               onChange={(e) => setMerchant(e.target.value)}
               className="bg-secondary border-border h-11"
             />
+            {fieldErrors.merchant?.[0] && <p className="text-sm text-destructive">{fieldErrors.merchant[0]}</p>}
           </div>
 
           {/* Date */}
@@ -123,6 +134,7 @@ export default function AddPage() {
               onChange={(e) => setDate(e.target.value)}
               className="bg-secondary border-border h-11"
             />
+            {fieldErrors.date?.[0] && <p className="text-sm text-destructive">{fieldErrors.date[0]}</p>}
           </div>
 
           {/* Category */}
@@ -138,6 +150,7 @@ export default function AddPage() {
                 ))}
               </SelectContent>
             </Select>
+            {fieldErrors.category_id?.[0] && <p className="text-sm text-destructive">{fieldErrors.category_id[0]}</p>}
           </div>
 
           {/* Payment method */}

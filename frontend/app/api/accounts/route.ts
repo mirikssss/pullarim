@@ -13,21 +13,25 @@ export async function GET() {
     return NextResponse.json({ error: "Failed to ensure accounts" }, { status: 500 })
   }
 
-  const { data: accountRows, error } = await supabase
-    .from("accounts")
-    .select("id, type, name, opening_balance, created_at")
-    .eq("user_id", user.id)
-    .order("type")
+  const [accountsResult, ledgerResult] = await Promise.all([
+    supabase
+      .from("accounts")
+      .select("id, type, name, opening_balance, created_at")
+      .eq("user_id", user.id)
+      .order("type"),
+    supabase
+      .from("ledger_entries")
+      .select("account_id, direction, amount")
+      .eq("user_id", user.id)
+      .gte("occurred_on", LEDGER_CUTOFF_DATE),
+  ])
 
+  const { data: accountRows, error } = accountsResult
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  const { data: ledgerSums } = await supabase
-    .from("ledger_entries")
-    .select("account_id, direction, amount")
-    .eq("user_id", user.id)
-    .gte("occurred_on", LEDGER_CUTOFF_DATE)
+  const { data: ledgerSums } = ledgerResult
 
   const byAccount: Record<string, { in: number; out: number }> = {}
   for (const r of ledgerSums ?? []) {

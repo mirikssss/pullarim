@@ -11,9 +11,13 @@ import { formatUZS } from "@/lib/formatters"
 import { fetcher, expensesKey } from "@/lib/api"
 import type { Expense } from "@/lib/types"
 
+const DEFAULT_BUDGET = 5_000_000
+
 interface Props {
   fadeUp: Variants
   expenses: Expense[]
+  /** Месячный бюджет из настроек (профиль). */
+  budget?: number | null
 }
 
 const RANGES = [
@@ -57,8 +61,9 @@ function getSparklineData(expenses: Expense[], range: Range): { v: number }[] {
   return data
 }
 
-export function SpendingSummary({ fadeUp, expenses }: Props) {
+export function SpendingSummary({ fadeUp, expenses, budget: budgetProp }: Props) {
   const [range, setRange] = useState<Range>("today")
+  const budget = budgetProp ?? DEFAULT_BUDGET
   const filtered = useMemo(() => {
     const now = new Date()
     return expenses.filter((e) => {
@@ -77,7 +82,6 @@ export function SpendingSummary({ fadeUp, expenses }: Props) {
   }, [expenses, range])
   const spent = useMemo(() => filtered.reduce((s, e) => s + e.amount, 0), [filtered])
   const sparkline = useMemo(() => getSparklineData(expenses, range), [expenses, range])
-  const budget = 5_000_000
 
   return (
     <motion.div

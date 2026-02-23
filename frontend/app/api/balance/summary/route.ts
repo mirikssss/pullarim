@@ -16,8 +16,10 @@ export async function GET(request: NextRequest) {
   const date_from = from.toISOString().slice(0, 10)
 
   const supabase = await createClient()
-  const cardId = await getAccountId(supabase, user.id, "card")
-  const cashId = await getAccountId(supabase, user.id, "cash")
+  const [cardId, cashId] = await Promise.all([
+    getAccountId(supabase, user.id, "card"),
+    getAccountId(supabase, user.id, "cash"),
+  ])
   if (!cardId || !cashId) {
     return NextResponse.json({ error: "Accounts not found" }, { status: 404 })
   }
@@ -52,20 +54,24 @@ export async function GET(request: NextRequest) {
       .slice(0, n)
       .map(([merchant, amount]) => ({ merchant, amount }))
 
-  const { data: expensesCard } = await supabase
-    .from("expenses")
-    .select("amount, category_id")
-    .eq("user_id", user.id)
-    .eq("payment_method", "card")
-    .gte("date", date_from)
-    .lte("date", today)
-  const { data: expensesCash } = await supabase
-    .from("expenses")
-    .select("amount, category_id")
-    .eq("user_id", user.id)
-    .eq("payment_method", "cash")
-    .gte("date", date_from)
-    .lte("date", today)
+  const [expensesCardResult, expensesCashResult] = await Promise.all([
+    supabase
+      .from("expenses")
+      .select("amount, category_id")
+      .eq("user_id", user.id)
+      .eq("payment_method", "card")
+      .gte("date", date_from)
+      .lte("date", today),
+    supabase
+      .from("expenses")
+      .select("amount, category_id")
+      .eq("user_id", user.id)
+      .eq("payment_method", "cash")
+      .gte("date", date_from)
+      .lte("date", today),
+  ])
+  const { data: expensesCard } = expensesCardResult
+  const { data: expensesCash } = expensesCashResult
 
   const byCategory = (rows: { amount: number; category_id: string }[] | null) => {
     const map: Record<string, number> = {}

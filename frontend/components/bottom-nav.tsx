@@ -2,14 +2,15 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LayoutDashboard, Banknote, Plus, Receipt, Settings } from "lucide-react"
+import { LayoutDashboard, Wallet, Banknote, Plus, Receipt, Settings } from "lucide-react"
 import { motion } from "framer-motion"
 
 const NAV_ITEMS = [
   { href: "/app/dashboard", label: "Главная", icon: LayoutDashboard },
-  { href: "/app/salary", label: "Зарплата", icon: Banknote },
+  { href: "/app/balance", label: "Баланс", icon: Wallet },
   { href: "/app/add", label: "Добавить", icon: Plus, isCenter: true },
   { href: "/app/expenses", label: "Расходы", icon: Receipt },
+  { href: "/app/salary", label: "Зарплата", icon: Banknote },
   { href: "/app/settings", label: "Ещё", icon: Settings },
 ]
 

@@ -24,6 +24,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { formatUZS } from "@/lib/formatters"
+import { toast } from "sonner"
 import {
   fetcher,
   salaryModesKey,
@@ -31,6 +32,7 @@ import {
   salaryForecastKey,
   salaryPaymentsKey,
   salaryIncomeSummaryKey,
+  parseErrorResponse,
 } from "@/lib/api"
 import type { SalaryMode, Payment } from "@/lib/types"
 import {
@@ -162,19 +164,23 @@ export default function SalaryPage() {
     const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(dayNum).padStart(2, "0")}`
     const isException = exceptionDates.has(dateStr)
     try {
-      if (isException) {
-        await fetch(`/api/salary/exceptions?date=${dateStr}`, { method: "DELETE" })
-      } else {
-        await fetch("/api/salary/exceptions", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ date: dateStr }),
-        })
+      const res = isException
+        ? await fetch(`/api/salary/exceptions?date=${dateStr}`, { method: "DELETE" })
+        : await fetch("/api/salary/exceptions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ date: dateStr }),
+          })
+      if (!res.ok) {
+        const { message } = await parseErrorResponse(res)
+        toast.error(message)
+        return
       }
       mutateExceptions()
       mutateForecast()
+      toast.success("День обновлён")
     } catch {
-      // TODO: toast
+      toast.error("Ошибка обновления")
     }
   }
 
@@ -205,7 +211,7 @@ export default function SalaryPage() {
     if (!newModeActive && !newModeEndDate) return
     setSavingMode(true)
     try {
-      await fetch("/api/salary/modes", {
+      const res = await fetch("/api/salary/modes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -216,6 +222,12 @@ export default function SalaryPage() {
           active: newModeActive,
         }),
       })
+      if (!res.ok) {
+        const { message } = await parseErrorResponse(res)
+        toast.error(message)
+        return
+      }
+      toast.success("Режим добавлен")
       mutateModes()
       mutateForecast()
       setAddModeOpen(false)
@@ -225,7 +237,7 @@ export default function SalaryPage() {
       setNewModeEndDate("")
       setNewModeActive(true)
     } catch {
-      // TODO: toast
+      toast.error("Ошибка сети")
     } finally {
       setSavingMode(false)
     }
@@ -248,7 +260,7 @@ export default function SalaryPage() {
     if (!editMode) return
     setSavingEdit(true)
     try {
-      await fetch("/api/salary/modes", {
+      const res = await fetch("/api/salary/modes", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -257,12 +269,18 @@ export default function SalaryPage() {
           end_date: editEndDate || null,
         }),
       })
+      if (!res.ok) {
+        const { message } = await parseErrorResponse(res)
+        toast.error(message)
+        return
+      }
+      toast.success("Режим сохранён")
       mutateModes()
       mutateForecast()
       setEditModeOpen(false)
       setEditMode(null)
     } catch {
-      // TODO: toast
+      toast.error("Ошибка сети")
     } finally {
       setSavingEdit(false)
     }
@@ -272,7 +290,7 @@ export default function SalaryPage() {
     if (!markReceivedData) return
     setSaving(true)
     try {
-      await fetch("/api/salary/payments", {
+      const res = await fetch("/api/salary/payments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -282,13 +300,19 @@ export default function SalaryPage() {
           received: true,
         }),
       })
+      if (!res.ok) {
+        const { message } = await parseErrorResponse(res)
+        toast.error(message)
+        return
+      }
+      toast.success("Выплата отмечена")
       mutatePayments()
       mutatePaymentsForReceived()
       mutateIncome()
       setMarkReceivedOpen(false)
       setMarkReceivedData(null)
     } catch {
-      // TODO: toast
+      toast.error("Ошибка сети")
     } finally {
       setSaving(false)
     }
@@ -305,7 +329,7 @@ export default function SalaryPage() {
     if (!paymentDetail) return
     setSavingPayment(true)
     try {
-      await fetch("/api/salary/payments", {
+      const res = await fetch("/api/salary/payments", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -314,6 +338,12 @@ export default function SalaryPage() {
           amount: Number(editPayAmount),
         }),
       })
+      if (!res.ok) {
+        const { message } = await parseErrorResponse(res)
+        toast.error(message)
+        return
+      }
+      toast.success("Выплата сохранена")
       mutatePayments()
       mutatePaymentsForReceived()
       mutateIncome()
@@ -321,7 +351,7 @@ export default function SalaryPage() {
       setPaymentDetailOpen(false)
       setPaymentDetail(null)
     } catch {
-      // TODO: toast
+      toast.error("Ошибка сети")
     } finally {
       setSavingPayment(false)
     }
@@ -331,7 +361,13 @@ export default function SalaryPage() {
     if (!paymentDetail) return
     setSavingPayment(true)
     try {
-      await fetch(`/api/salary/payments/${paymentDetail.id}`, { method: "DELETE" })
+      const res = await fetch(`/api/salary/payments/${paymentDetail.id}`, { method: "DELETE" })
+      if (!res.ok) {
+        const { message } = await parseErrorResponse(res)
+        toast.error(message)
+        return
+      }
+      toast.success("Выплата удалена")
       mutatePayments()
       mutatePaymentsForReceived()
       mutateIncome()
@@ -339,7 +375,7 @@ export default function SalaryPage() {
       setPaymentDetailOpen(false)
       setPaymentDetail(null)
     } catch {
-      // TODO: toast
+      toast.error("Ошибка сети")
     } finally {
       setSavingPayment(false)
     }

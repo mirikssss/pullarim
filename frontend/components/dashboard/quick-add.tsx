@@ -7,7 +7,8 @@ import { Plus, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { fetcher, categoriesKey } from "@/lib/api"
+import { toast } from "sonner"
+import { fetcher, categoriesKey, parseErrorResponse } from "@/lib/api"
 import type { Category } from "@/lib/types"
 
 interface Props {
@@ -38,12 +39,17 @@ export function QuickAdd({ fadeUp, onSuccess }: Props) {
           date: new Date().toISOString().slice(0, 10),
         }),
       })
-      if (!res.ok) throw new Error(await res.text())
+      if (!res.ok) {
+        const { message } = await parseErrorResponse(res)
+        toast.error(message)
+        return
+      }
+      toast.success("Расход добавлен")
       setAmount("")
       setCategory("")
       onSuccess?.()
     } catch {
-      // TODO: toast error
+      toast.error("Ошибка сети")
     } finally {
       setLoading(false)
     }

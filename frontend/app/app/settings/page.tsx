@@ -8,8 +8,9 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { toast } from "sonner"
 import { createClient } from "@/lib/supabase/client"
-import { fetcher, profileKey, accountsKey } from "@/lib/api"
+import { fetcher, profileKey, accountsKey, parseErrorResponse } from "@/lib/api"
 import { formatUZS } from "@/lib/formatters"
 import type { Account } from "@/lib/types"
 import {
@@ -46,6 +47,7 @@ export default function SettingsPage() {
   const { data: profile, mutate } = useSWR(profileKey(), fetcher)
   const [editOpen, setEditOpen] = useState(false)
   const [editName, setEditName] = useState("")
+  const [editBudget, setEditBudget] = useState("")
   const [saving, setSaving] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [deletingExpenses, setDeletingExpenses] = useState(false)
@@ -62,6 +64,7 @@ export default function SettingsPage() {
   const [newPasswordConfirm, setNewPasswordConfirm] = useState("")
   const [passwordSaving, setPasswordSaving] = useState(false)
   const [passwordError, setPasswordError] = useState("")
+  const [profileFieldErrors, setProfileFieldErrors] = useState<Record<string, string[]>>({})
   const { data: accountsData, mutate: mutateAccounts } = useSWR<{ accounts: Account[] }>(accountsKey(), fetcher)
   const accounts = accountsData?.accounts ?? []
   const cardAccount = accounts.find((a) => a.type === "card")
@@ -74,22 +77,35 @@ export default function SettingsPage() {
 
   const openEdit = () => {
     setEditName(profile?.full_name ?? "")
+    const mb = (profile as { monthly_budget?: number | null })?.monthly_budget
+    setEditBudget(mb != null && mb > 0 ? String(mb) : "")
     setEditOpen(true)
   }
 
   const saveProfile = async () => {
     setSaving(true)
     try {
+      const monthly_budget = editBudget.trim() ? Math.max(0, parseInt(editBudget, 10) || 0) : null
       const res = await fetch("/api/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ full_name: editName.trim() || "Пользователь" }),
+        body: JSON.stringify({
+          full_name: editName.trim() || "Пользователь",
+          ...(monthly_budget !== null && { monthly_budget }),
+        }),
       })
-      if (!res.ok) throw new Error(await res.text())
+      if (!res.ok) {
+        const { message, fieldErrors: errFields } = await parseErrorResponse(res)
+        setProfileFieldErrors(errFields ?? {})
+        toast.error(message)
+        return
+      }
+      setProfileFieldErrors({})
+      toast.success("Профиль сохранён")
       mutate()
       setEditOpen(false)
     } catch {
-      // TODO: toast
+      toast.error("Ошибка сети")
     } finally {
       setSaving(false)
     }
@@ -107,8 +123,9 @@ export default function SettingsPage() {
       a.download = `pullarim-export-${new Date().toISOString().slice(0, 10)}.csv`
       a.click()
       URL.revokeObjectURL(url)
+      toast.success("Экспорт скачан")
     } catch {
-      // TODO: toast
+      toast.error("Ошибка экспорта")
     } finally {
       setExporting(false)
     }
@@ -120,10 +137,11 @@ export default function SettingsPage() {
       const res = await fetch("/api/expenses/dev/delete-all", { method: "DELETE" })
       if (!res.ok) throw new Error(await res.text())
       setDeleteAllDialogOpen(false)
+      toast.success("Расходы удалены")
       router.refresh()
       window.location.reload()
     } catch {
-      // TODO: toast
+      toast.error("Ошибка удаления")
     } finally {
       setDeletingExpenses(false)
     }
@@ -586,6 +604,22 @@ export default function SettingsPage() {
                 placeholder="Ваше имя"
                 className="bg-secondary border-border"
               />
+              {profileFieldErrors.full_name?.[0] && <p className="text-sm text-destructive">{profileFieldErrors.full_name[0]}</p>}
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="edit-budget" className="text-sm text-muted-foreground">Бюджет на месяц (сум)</Label>
+              <Input
+                id="edit-budget"
+                type="number"
+                inputMode="numeric"
+                min={0}
+                value={editBudget}
+                onChange={(e) => setEditBudget(e.target.value)}
+                placeholder="5 000 000"
+                className="bg-secondary border-border"
+              />
+              {profileFieldErrors.monthly_budget?.[0] && <p className="text-sm text-destructive">{profileFieldErrors.monthly_budget[0]}</p>}
+              <p className="text-xs text-muted-foreground">Используется на дашборде для сравнения с расходами за месяц</p>
             </div>
             <p className="text-xs text-muted-foreground">Email изменить нельзя</p>
           </div>

@@ -176,6 +176,7 @@ export const transfersGetQuerySchema = z.object({
 export const profilePatchBodySchema = z.object({
   full_name: z.string().optional(),
   avatar_url: z.string().url().nullable().optional(),
+  monthly_budget: z.number().int().nonnegative().nullable().optional(),
 })
 
 // --- Export ---
@@ -212,6 +213,9 @@ export function salaryModesOverlap(
   }
   return false
 }
+
+/** category_mapping: объект «ключ — id категории». */
+export const categoryMappingSchema = z.record(z.string(), z.string())
 
 export const importPaymeCommitBodySchema = z.object({
   rows: z.array(z.object({

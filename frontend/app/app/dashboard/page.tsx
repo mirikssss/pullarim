@@ -147,7 +147,7 @@ export default function DashboardPage() {
         className="flex flex-col gap-4 p-4"
       >
         <BalanceCards fadeUp={fadeUp} />
-        <SpendingSummary fadeUp={fadeUp} expenses={expenses} />
+        <SpendingSummary fadeUp={fadeUp} expenses={expenses} budget={(profile as { monthly_budget?: number | null })?.monthly_budget} />
         {incomeSummary && (
           <motion.div
             variants={fadeUp}

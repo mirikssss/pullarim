@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { getAuthUser, unauthorized } from "@/lib/api-auth"
-import { validationErrorResponse } from "@/lib/api-validation"
+import { validationErrorResponse, categoryMappingSchema } from "@/lib/api-validation"
 import { resolveCategory } from "@/lib/payme-category-mapper"
 import * as XLSX from "xlsx"
 import { createHash } from "crypto"
@@ -69,12 +69,24 @@ export async function POST(request: NextRequest) {
   const defaultCategoryId = (formData.get("default_category_id") as string | null)?.trim() || null
   let categoryMapping: Record<string, string> = {}
   const mappingJson = formData.get("category_mapping") as string | null
-  if (mappingJson) {
+  if (mappingJson && mappingJson.trim()) {
+    let parsed: unknown
     try {
-      categoryMapping = JSON.parse(mappingJson) as Record<string, string>
+      parsed = JSON.parse(mappingJson)
     } catch {
-      // ignore
+      return NextResponse.json(
+        validationErrorResponse("Некорректный JSON в category_mapping"),
+        { status: 400 }
+      )
     }
+    const mapped = categoryMappingSchema.safeParse(parsed)
+    if (!mapped.success) {
+      return NextResponse.json(
+        validationErrorResponse("category_mapping: ожидается объект с ключами и id категорий (строки)"),
+        { status: 400 }
+      )
+    }
+    categoryMapping = mapped.data
   }
   if (!file || !(file instanceof Blob)) {
     return NextResponse.json(validationErrorResponse("file required"), { status: 400 })

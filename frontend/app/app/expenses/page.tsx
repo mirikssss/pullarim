@@ -49,7 +49,8 @@ import {
 } from "@/components/ui/alert-dialog"
 import { formatUZS, formatUZSShort } from "@/lib/formatters"
 import { AnimatedNumber } from "@/components/ui/animated-number"
-import { fetcher, expensesKey, categoriesKey } from "@/lib/api"
+import { toast } from "sonner"
+import { fetcher, expensesKey, categoriesKey, parseErrorResponse } from "@/lib/api"
 import type { Expense, Category } from "@/lib/types"
 import Link from "next/link"
 
@@ -238,11 +239,16 @@ export default function ExpensesPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       })
-      if (!res.ok) throw new Error(await res.text())
+      if (!res.ok) {
+        const { message } = await parseErrorResponse(res)
+        toast.error(message)
+        return
+      }
+      toast.success("Расход сохранён")
       setEditExpense(null)
       mutate()
     } catch {
-      // TODO: toast
+      toast.error("Ошибка сети")
     } finally {
       setSaving(false)
     }
@@ -253,11 +259,16 @@ export default function ExpensesPage() {
     setDeleting(true)
     try {
       const res = await fetch(`/api/expenses/${deleteExpense.id}`, { method: "DELETE" })
-      if (!res.ok) throw new Error(await res.text())
+      if (!res.ok) {
+        const { message } = await parseErrorResponse(res)
+        toast.error(message)
+        return
+      }
+      toast.success("Расход удалён")
       setDeleteExpense(null)
       mutate()
     } catch {
-      // TODO: toast
+      toast.error("Ошибка сети")
     } finally {
       setDeleting(false)
     }
@@ -270,12 +281,17 @@ export default function ExpensesPage() {
       setConvertingId(expense.id)
       try {
         const res = await fetch(`/api/expenses/${expense.id}/convert-to-withdrawal`, { method: "POST" })
-        if (!res.ok) throw new Error(await res.text())
+        if (!res.ok) {
+          const { message } = await parseErrorResponse(res)
+          toast.error(message)
+          return
+        }
+        toast.success("Перевод оформлен")
         setEditExpense(null)
         setDetailExpense(null)
         mutate()
       } catch {
-        // TODO: toast
+        toast.error("Ошибка сети")
       } finally {
         setConvertingId(null)
       }
@@ -292,13 +308,18 @@ export default function ExpensesPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids: Array.from(selectedIds) }),
       })
-      if (!res.ok) throw new Error(await res.text())
+      if (!res.ok) {
+        const { message } = await parseErrorResponse(res)
+        toast.error(message)
+        return
+      }
+      toast.success("Расходы удалены")
       setSelectedIds(new Set())
       setSelectionMode(false)
       setBulkDeleteOpen(false)
       mutate()
     } catch {
-      // TODO: toast
+      toast.error("Ошибка сети")
     } finally {
       setDeleting(false)
     }

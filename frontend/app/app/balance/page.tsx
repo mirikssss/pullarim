@@ -1,9 +1,10 @@
 "use client"
 
-import { useState, useMemo, Suspense, Fragment } from "react"
+import { useState, useMemo, Suspense, Fragment, useTransition } from "react"
 import useSWR from "swr"
-import { useSearchParams } from "next/navigation"
+import { useSearchParams, useRouter } from "next/navigation"
 import { CreditCard, Banknote, Wallet, ArrowDownRight, ArrowUpRight } from "lucide-react"
+import { motion } from "framer-motion"
 import { formatUZS } from "@/lib/formatters"
 import { AnimatedNumber } from "@/components/ui/animated-number"
 import { fetcher, accountsKey, ledgerKey, balanceSummaryKey } from "@/lib/api"
@@ -25,11 +26,20 @@ const RANGES = [
 ]
 
 function BalancePageContent() {
+  const router = useRouter()
   const searchParams = useSearchParams()
   const accountParam = searchParams.get("account") ?? "all"
   const tabKey = accountParam === "cash" ? "cash" : accountParam === "card" ? "card" : "all"
+  const [isPending, startTransition] = useTransition()
 
   const [range, setRange] = useState<"7d" | "15d" | "30d">("7d")
+
+  const setTab = (key: typeof tabKey) => {
+    startTransition(() => {
+      const url = key === "all" ? "/app/balance" : `/app/balance?account=${key}`
+      router.push(url, { scroll: false })
+    })
+  }
   const dateTo = new Date().toISOString().slice(0, 10)
 
   const { data: accountsData } = useSWR<{ accounts: Account[]; total: number }>(accountsKey(), fetcher)
@@ -99,23 +109,34 @@ function BalancePageContent() {
         </div>
       </div>
 
-      <div className="p-4 flex flex-col gap-4">
-        {/* Tabs */}
+      <div className={`p-4 flex flex-col gap-4 transition-opacity duration-150 ${isPending ? "opacity-70" : "opacity-100"}`}>
+        {/* Tabs — клиентское переключение без перезагрузки */}
         <div className="flex gap-1 p-1 rounded-lg bg-secondary">
           {TABS.map((t) => {
             const Icon = t.icon
             const isActive = tabKey === t.key
             return (
-              <a
+              <button
                 key={t.key}
-                href={t.key === "all" ? "/app/balance" : `/app/balance?account=${t.key}`}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-md text-sm font-medium transition-colors ${
-                  isActive ? "bg-card border border-border shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"
+                type="button"
+                onClick={() => setTab(t.key)}
+                disabled={isPending && isActive}
+                className={`relative flex-1 flex items-center justify-center gap-1.5 py-2 rounded-md text-sm font-medium transition-colors ${
+                  isActive ? "text-foreground" : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                <Icon className="w-4 h-4" />
-                {t.label}
-              </a>
+                {isActive && (
+                  <motion.div
+                    layoutId="balance-tab"
+                    className="absolute inset-0 rounded-md bg-card border border-border shadow-sm"
+                    transition={{ type: "spring", bounce: 0.2, duration: 0.35 }}
+                  />
+                )}
+                <span className="relative z-10 flex items-center gap-1.5">
+                  <Icon className="w-4 h-4" />
+                  {t.label}
+                </span>
+              </button>
             )
           })}
         </div>

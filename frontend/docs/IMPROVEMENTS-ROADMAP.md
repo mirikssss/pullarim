@@ -39,7 +39,7 @@
 | Что | Где | Рекомендация |
 |-----|-----|--------------|
 | Тема (светлая/тёмная) | `app/layout.tsx` | Есть `ThemeProvider` в `components/theme-provider.tsx`, но он не обёрнут вокруг приложения. Обернуть `<body>` в `<ThemeProvider>`, чтобы переключатель темы работал глобально. |
-| Бюджет на дашборде | `components/dashboard/spending-summary.tsx` | Сейчас `const budget = 5_000_000` захардкожен. Вынести лимит в настройки: поле в профиле или отдельная сущность (например `user_settings.monthly_budget`), подставлять в компонент. |
+| Бюджет на дашборде | `components/dashboard/spending-summary.tsx` | ~~Сделано: бюджет в профиле (`monthly_budget`), настройки → Редактировать профиль, дашборд подставляет из профиля. В Supabase в таблице `profiles` добавить колонку `monthly_budget` (integer, nullable), если её ещё нет.~~ |
 | Viewport | `app/layout.tsx` | `userScalable: false` ухудшает доступность. Убрать или заменить на `maximumScale: 5` и разрешить масштаб. |
 
 ---

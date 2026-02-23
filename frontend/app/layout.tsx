@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next"
 import { Wix_Madefor_Display, Playfair_Display } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
+import { ThemeProvider } from "@/components/theme-provider"
+import { Toaster } from "@/components/ui/sonner"
 import "./globals.css"
 
 const wixMadefor = Wix_Madefor_Display({
@@ -32,8 +34,7 @@ export const viewport: Viewport = {
   themeColor: "#f5f5f0",
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
+  maximumScale: 5,
 }
 
 export default function RootLayout({
@@ -44,8 +45,11 @@ export default function RootLayout({
   return (
     <html lang="ru" suppressHydrationWarning>
       <body className={`${wixMadefor.variable} ${playfair.variable} font-sans antialiased`} suppressHydrationWarning>
-        {children}
-        <Analytics />
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+          {children}
+          <Toaster richColors position="top-center" />
+          <Analytics />
+        </ThemeProvider>
       </body>
     </html>
   )

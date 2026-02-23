@@ -2,11 +2,36 @@
 
 const API = "/api"
 
+/** Извлечь сообщение об ошибке из ответа API. API может вернуть { error: string } или { error: { code, message, fieldErrors? } }. */
+export function getErrorMessage(err: unknown, resStatusText: string): string {
+  if (err == null || typeof err !== "object") return resStatusText
+  const e = err as { error?: unknown }
+  const error = e.error
+  if (typeof error === "string") return error || resStatusText
+  if (error != null && typeof error === "object" && "message" in error && typeof (error as { message: unknown }).message === "string") {
+    return (error as { message: string }).message
+  }
+  return resStatusText
+}
+
+/** Для форм: разобрать ответ с ошибкой и вернуть { message, fieldErrors }. */
+export async function parseErrorResponse(res: Response): Promise<{ message: string; fieldErrors?: Record<string, string[]> }> {
+  const body = await res.json().catch(() => ({}))
+  const err = body?.error
+  const message = getErrorMessage(body, res.statusText)
+  const fieldErrors =
+    err != null && typeof err === "object" && "fieldErrors" in err && typeof (err as { fieldErrors: unknown }).fieldErrors === "object"
+      ? (err as { fieldErrors: Record<string, string[]> }).fieldErrors
+      : undefined
+  return { message, fieldErrors }
+}
+
 export async function fetcher<T>(url: string): Promise<T> {
   const res = await fetch(url)
   if (!res.ok) {
-    const err = await res.json().catch(() => ({}))
-    throw new Error(err.error ?? res.statusText)
+    const body = await res.json().catch(() => ({}))
+    const message = getErrorMessage(body, res.statusText)
+    throw new Error(message)
   }
   return res.json()
 }
