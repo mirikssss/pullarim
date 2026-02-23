@@ -84,12 +84,46 @@ export default function AddPage() {
     }
 
     rec.onerror = (e: SpeechRecognitionErrorEvent) => {
-      if (e.error !== "aborted") toast.error("Ошибка микрофона")
+      if (e.error === "aborted") {
+        setIsRecording(false)
+        return
+      }
+      const msg =
+        e.error === "not-allowed"
+          ? "Разрешите доступ к микрофону в настройках браузера (иконка замка или «Разрешить»)"
+          : e.error === "no-speech"
+            ? "Речь не распознана. Скажите фразу ещё раз и нажмите стоп."
+            : e.error === "audio-capture"
+              ? "Микрофон не найден. Подключите микрофон и обновите страницу."
+              : e.error === "network"
+                ? "Ошибка сети. Проверьте интернет."
+                : "Ошибка микрофона. Проверьте разрешения и попробуйте снова."
+      toast.error(msg)
       setIsRecording(false)
     }
 
     recognitionRef.current = rec
-    rec.start()
+
+    const startRecognition = () => {
+      try {
+        rec.start()
+      } catch (err) {
+        toast.error("Не удалось запустить микрофон. Разрешите доступ и обновите страницу.")
+        setIsRecording(false)
+      }
+    }
+
+    if (typeof navigator !== "undefined" && navigator.mediaDevices?.getUserMedia) {
+      navigator.mediaDevices
+        .getUserMedia({ audio: true })
+        .then(() => startRecognition())
+        .catch(() => {
+          toast.error("Разрешите доступ к микрофону в настройках браузера.")
+          setIsRecording(false)
+        })
+    } else {
+      startRecognition()
+    }
 
     return () => {
       try {
@@ -102,9 +136,13 @@ export default function AddPage() {
   }, [isRecording])
 
   const handleMicClick = () => {
-    const api = typeof window !== "undefined"
-      ? (window.SpeechRecognition || (window as unknown as { webkitSpeechRecognition?: SpeechRecognition }).webkitSpeechRecognition)
-      : null
+    if (typeof window === "undefined") return
+    if (!window.isSecureContext) {
+      toast.error("Голосовой ввод работает только по HTTPS или на localhost.")
+      return
+    }
+    const api =
+      window.SpeechRecognition || (window as unknown as { webkitSpeechRecognition?: SpeechRecognition }).webkitSpeechRecognition
     if (!api) {
       toast.error("Голосовой ввод не поддерживается в этом браузере. Попробуйте Chrome или Safari.")
       return
