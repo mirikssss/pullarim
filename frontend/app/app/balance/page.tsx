@@ -6,7 +6,6 @@ import { useSearchParams, useRouter } from "next/navigation"
 import { CreditCard, Banknote, Wallet, ArrowDownRight, ArrowUpRight } from "lucide-react"
 import { motion } from "framer-motion"
 import { formatUZS } from "@/lib/formatters"
-import { AnimatedNumber } from "@/components/ui/animated-number"
 import { fetcher, accountsKey, ledgerKey, balanceSummaryKey } from "@/lib/api"
 import type { Account, LedgerEntry } from "@/lib/types"
 
@@ -148,11 +147,7 @@ function BalancePageContent() {
               {tabKey === "card" ? "Карта" : tabKey === "cash" ? "Наличные" : "Всего"}
             </p>
             <p className="text-2xl font-extrabold tabular-nums text-foreground whitespace-nowrap overflow-hidden text-ellipsis min-w-0">
-              <AnimatedNumber
-                value={tabKey === "card" ? (card?.computed_balance ?? 0) : tabKey === "cash" ? (cash?.computed_balance ?? 0) : total}
-                format={formatUZS}
-                duration={800}
-              />
+              {formatUZS(tabKey === "card" ? (card?.computed_balance ?? 0) : tabKey === "cash" ? (cash?.computed_balance ?? 0) : total)}
             </p>
           </div>
         </div>
@@ -160,19 +155,19 @@ function BalancePageContent() {
           <div className="rounded-xl border border-border bg-card p-3">
             <p className="text-xs text-muted-foreground mb-0.5">Карта</p>
             <p className="text-xl font-extrabold tabular-nums text-foreground whitespace-nowrap overflow-hidden text-ellipsis min-w-0">
-              <AnimatedNumber value={card?.computed_balance ?? 0} format={formatUZS} duration={800} />
+              {formatUZS(card?.computed_balance ?? 0)}
             </p>
           </div>
           <div className="rounded-xl border border-border bg-card p-3">
             <p className="text-xs text-muted-foreground mb-0.5">Наличные</p>
             <p className="text-xl font-extrabold tabular-nums text-foreground whitespace-nowrap overflow-hidden text-ellipsis min-w-0">
-              <AnimatedNumber value={cash?.computed_balance ?? 0} format={formatUZS} duration={800} />
+              {formatUZS(cash?.computed_balance ?? 0)}
             </p>
           </div>
           <div className="rounded-xl border border-border bg-card p-3">
             <p className="text-xs text-muted-foreground mb-0.5">Всего</p>
             <p className="text-xl font-extrabold tabular-nums text-foreground whitespace-nowrap overflow-hidden text-ellipsis min-w-0">
-              <AnimatedNumber value={total} format={formatUZS} duration={800} delay={100} />
+              {formatUZS(total)}
             </p>
           </div>
         </div>
@@ -200,7 +195,7 @@ function BalancePageContent() {
                 <div key={i} className="flex justify-between text-sm">
                   <span className="text-foreground truncate pr-2">{m.merchant}</span>
                   <span className="text-foreground font-semibold tabular-nums shrink-0">
-                    <AnimatedNumber value={m.amount} format={formatUZS} duration={600} delay={i * 50} />
+                    {formatUZS(m.amount)}
                   </span>
                 </div>
               ))}
@@ -213,7 +208,7 @@ function BalancePageContent() {
                 <div key={i} className="flex justify-between text-sm">
                   <span className="text-foreground">{c.category_id}</span>
                   <span className="text-foreground font-semibold tabular-nums">
-                    <AnimatedNumber value={c.amount} format={formatUZS} duration={600} delay={i * 50} />
+                    {formatUZS(c.amount)}
                   </span>
                 </div>
               ))}

@@ -48,7 +48,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { formatUZS, formatUZSShort } from "@/lib/formatters"
-import { AnimatedNumber } from "@/components/ui/animated-number"
 import { toast } from "sonner"
 import { fetcher, expensesKey, categoriesKey, parseErrorResponse } from "@/lib/api"
 import type { Expense, Category } from "@/lib/types"
@@ -434,7 +433,7 @@ export default function ExpensesPage() {
           <div>
             <p className="text-xs text-muted-foreground">Итого за период</p>
             <p className="text-2xl sm:text-3xl font-extrabold tabular-nums text-foreground">
-              <AnimatedNumber value={periodTotal} format={formatUZS} duration={800} />
+              {formatUZS(periodTotal)}
             </p>
             <p className="text-xs text-muted-foreground mt-0.5">{expenses.length} расходов</p>
           </div>
@@ -588,34 +587,27 @@ export default function ExpensesPage() {
               <div>
                 <p className="text-xs text-muted-foreground">Итого за период</p>
                 <p className="text-xl sm:text-2xl font-extrabold tabular-nums text-foreground">
-                  <AnimatedNumber value={periodTotal} format={formatUZS} duration={700} />
+                  {formatUZS(periodTotal)}
                 </p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">В среднем в день</p>
                 <p className="text-xl sm:text-2xl font-extrabold tabular-nums text-foreground">
-                  {chartData.spendingByDay.length > 0 ? (
-                    <AnimatedNumber
-                      value={Math.round(periodTotal / chartData.spendingByDay.length)}
-                      format={formatUZS}
-                      duration={700}
-                      delay={80}
-                    />
-                  ) : (
-                    "—"
-                  )}
+                  {chartData.spendingByDay.length > 0
+                    ? formatUZS(Math.round(periodTotal / chartData.spendingByDay.length))
+                    : "—"}
                 </p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Операций</p>
                 <p className="text-xl sm:text-2xl font-extrabold tabular-nums text-foreground">
-                  <AnimatedNumber value={expenses.length} integer duration={600} delay={120} />
+                  {expenses.length}
                 </p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Дней с расходами</p>
                 <p className="text-xl sm:text-2xl font-extrabold tabular-nums text-foreground">
-                  <AnimatedNumber value={chartData.spendingByDay.length} integer duration={600} delay={160} />
+                  {chartData.spendingByDay.length}
                 </p>
               </div>
             </div>

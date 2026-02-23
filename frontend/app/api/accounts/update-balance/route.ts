@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { createClient } from "@/lib/supabase/server"
 import { getAuthUser, unauthorized } from "@/lib/api-auth"
-import { getAccountId } from "@/lib/ledger"
+import { getAccountId, LEDGER_CUTOFF_DATE } from "@/lib/ledger"
 import { z } from "zod"
 
 const bodySchema = z.object({
@@ -10,7 +10,7 @@ const bodySchema = z.object({
   opening_balance_cash: z.number().int().optional(),
 })
 
-/** Update opening_balance for card/cash. Requires current password. */
+/** Full update: user sends desired current balance (computed). We set opening_balance so that computed_balance = value. */
 export async function POST(request: NextRequest) {
   const user = await getAuthUser()
   if (!user) return unauthorized()
@@ -57,18 +57,37 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Счета не найдены" }, { status: 500 })
   }
 
+  const { data: ledgerRows } = await supabase
+    .from("ledger_entries")
+    .select("account_id, direction, amount")
+    .eq("user_id", user.id)
+    .gte("occurred_on", LEDGER_CUTOFF_DATE)
+
+  const byAccount: Record<string, { in: number; out: number }> = {}
+  for (const r of ledgerRows ?? []) {
+    if (!byAccount[r.account_id]) byAccount[r.account_id] = { in: 0, out: 0 }
+    const amt = Number(r.amount)
+    if (r.direction === "in") byAccount[r.account_id].in += amt
+    else byAccount[r.account_id].out += amt
+  }
+
+  const ledgerDeltaCard = (byAccount[cardId]?.in ?? 0) - (byAccount[cardId]?.out ?? 0)
+  const ledgerDeltaCash = (byAccount[cashId]?.in ?? 0) - (byAccount[cashId]?.out ?? 0)
+
   if (opening_balance_card !== undefined) {
+    const newOpeningCard = opening_balance_card - ledgerDeltaCard
     const { error: e1 } = await supabase
       .from("accounts")
-      .update({ opening_balance: opening_balance_card, updated_at: new Date().toISOString() })
+      .update({ opening_balance: newOpeningCard, updated_at: new Date().toISOString() })
       .eq("id", cardId)
       .eq("user_id", user.id)
     if (e1) return NextResponse.json({ error: e1.message }, { status: 500 })
   }
   if (opening_balance_cash !== undefined) {
+    const newOpeningCash = opening_balance_cash - ledgerDeltaCash
     const { error: e2 } = await supabase
       .from("accounts")
-      .update({ opening_balance: opening_balance_cash, updated_at: new Date().toISOString() })
+      .update({ opening_balance: newOpeningCash, updated_at: new Date().toISOString() })
       .eq("id", cashId)
       .eq("user_id", user.id)
     if (e2) return NextResponse.json({ error: e2.message }, { status: 500 })

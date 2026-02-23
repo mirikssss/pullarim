@@ -150,8 +150,8 @@ export default function SettingsPage() {
   const openBalanceDialog = () => {
     setBalanceError("")
     setBalancePassword("")
-    setBalanceCard(cardAccount != null ? String(cardAccount.opening_balance) : "0")
-    setBalanceCash(cashAccount != null ? String(cashAccount.opening_balance) : "0")
+    setBalanceCard(cardAccount != null ? String(cardAccount.computed_balance) : "0")
+    setBalanceCash(cashAccount != null ? String(cashAccount.computed_balance) : "0")
     setBalanceDialogOpen(true)
   }
 
@@ -304,9 +304,9 @@ export default function SettingsPage() {
                 <Wallet className="w-4 h-4 text-muted-foreground" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm text-foreground">Изменить баланс на старт</p>
+                <p className="text-sm text-foreground">Изменить баланс</p>
                 <p className="text-xs text-muted-foreground">
-                  Карта: {formatUZS(cardAccount?.opening_balance ?? 0)} · Наличные: {formatUZS(cashAccount?.opening_balance ?? 0)}
+                  Карта: {formatUZS(cardAccount?.computed_balance ?? 0)} · Наличные: {formatUZS(cashAccount?.computed_balance ?? 0)}
                 </p>
               </div>
               <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
@@ -456,10 +456,10 @@ export default function SettingsPage() {
       <Dialog open={balanceDialogOpen} onOpenChange={setBalanceDialogOpen}>
         <DialogContent className="bg-card border-border max-w-sm">
           <DialogHeader>
-            <DialogTitle className="text-foreground">Изменить начальный баланс</DialogTitle>
+            <DialogTitle className="text-foreground">Изменить баланс</DialogTitle>
           </DialogHeader>
           <p className="text-xs text-muted-foreground">
-            Баланс на старт (до 20.02 движения не минусуются). Для смены введите пароль от аккаунта.
+            Укажите текущий баланс по карте и наличным — он будет сохранён как есть. Для смены введите пароль от аккаунта.
           </p>
           <div className="flex flex-col gap-4 py-2">
             <div className="flex flex-col gap-2">
@@ -475,7 +475,7 @@ export default function SettingsPage() {
               />
             </div>
             <div className="flex flex-col gap-2">
-              <Label htmlFor="balance-card" className="text-sm text-muted-foreground">Карта (на старт)</Label>
+              <Label htmlFor="balance-card" className="text-sm text-muted-foreground">Карта (текущий баланс)</Label>
               <Input
                 id="balance-card"
                 type="number"
@@ -486,7 +486,7 @@ export default function SettingsPage() {
               />
             </div>
             <div className="flex flex-col gap-2">
-              <Label htmlFor="balance-cash" className="text-sm text-muted-foreground">Наличные (на старт)</Label>
+              <Label htmlFor="balance-cash" className="text-sm text-muted-foreground">Наличные (текущий баланс)</Label>
               <Input
                 id="balance-cash"
                 type="number"
