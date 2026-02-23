@@ -39,11 +39,17 @@ const CHART_COLORS = [
   "var(--color-muted-foreground)",
 ]
 
+/** Только расходы, учитываемые в бюджете (без exclude_from_budget), чтобы графики отражали тенденцию. */
+function expensesInBudget(expenses: Expense[]) {
+  return expenses.filter((e) => !e.exclude_from_budget)
+}
+
 function computeCharts(expenses: Expense[]) {
+  const inBudget = expensesInBudget(expenses)
   const byDay: Record<string, number> = {}
   const byCategory: Record<string, { name: string; value: number; fill: string }> = {}
 
-  expenses.forEach((e) => {
+  inBudget.forEach((e) => {
     const day = new Date(e.date).getDate().toString()
     byDay[day] = (byDay[day] ?? 0) + e.amount
   })
@@ -53,7 +59,7 @@ function computeCharts(expenses: Expense[]) {
     return { day: d, amount: byDay[d] ?? 0 }
   })
 
-  expenses.forEach((e) => {
+  inBudget.forEach((e) => {
     const cat = e.category ?? { id: e.category_id, label: e.category_id, color: "" }
     const label = typeof cat === "object" ? cat.label : e.category_id
     if (!byCategory[e.category_id]) {

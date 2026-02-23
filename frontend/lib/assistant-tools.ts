@@ -62,7 +62,7 @@ export const ASSISTANT_TOOLS: ToolDefinition[] = [
     type: "function",
     function: {
       name: "get_spending_summary",
-      description: "Суммарные расходы за период. Возвращает total, avg_per_day, max_day, min_day. По умолчанию exclude_from_budget и transfers исключены.",
+      description: "Суммарные расходы за период (только учитываемые в бюджете; переводы и «не в бюджете» не включаются). Возвращает total, avg_per_day, max_day, min_day.",
       parameters: {
         type: "object",
         properties: {
@@ -72,7 +72,6 @@ export const ASSISTANT_TOOLS: ToolDefinition[] = [
             description: "today | yesterday | 7d | 15d | month",
           },
           month: { type: "string", description: "YYYY-MM для month (опционально)" },
-          includeExcluded: { type: "number", description: "1 чтобы включить переводы и exclude_from_budget" },
         },
         required: ["range"],
       },
@@ -82,7 +81,7 @@ export const ASSISTANT_TOOLS: ToolDefinition[] = [
     type: "function",
     function: {
       name: "get_spending_insights",
-      description: "Полный анализ расходов: total, by_category, out_of_home_food, food_groceries, baseline_avg_per_day (14д без выбросов), top_merchants, top_merchants_food, top_merchants_groceries, daily_series, biggest_outliers. ОБЯЗАТЕЛЕН для плана бюджета. range=14d для плана. includeExcluded=false по умолчанию.",
+      description: "Полный анализ расходов (только учитываемые в бюджете): total, by_category, out_of_home_food, food_groceries, baseline_avg_per_day (14д без выбросов), top_merchants, daily_series, biggest_outliers. ОБЯЗАТЕЛЕН для плана бюджета. range=14d для плана.",
       parameters: {
         type: "object",
         properties: {
@@ -94,7 +93,6 @@ export const ASSISTANT_TOOLS: ToolDefinition[] = [
           from: { type: "string", description: "YYYY-MM-DD для custom" },
           to: { type: "string", description: "YYYY-MM-DD для custom" },
           month: { type: "string", description: "YYYY-MM для month" },
-          includeExcluded: { type: "number", description: "1 чтобы включить переводы" },
         },
         required: ["range"],
       },
@@ -104,7 +102,7 @@ export const ASSISTANT_TOOLS: ToolDefinition[] = [
     type: "function",
     function: {
       name: "get_spending_by_category",
-      description: "Разбивка по категориям + top_merchants, outliers (топ-3 крупных), share_excluded, share_transfers. По умолчанию transfers и exclude исключены.",
+      description: "Разбивка по категориям + top_merchants, outliers (топ-3 крупных). Только расходы, учитываемые в бюджете; переводы и «не в бюджете» не включаются.",
       parameters: {
         type: "object",
         properties: {
@@ -114,7 +112,6 @@ export const ASSISTANT_TOOLS: ToolDefinition[] = [
             description: "today | yesterday | 7d | 15d | month",
           },
           month: { type: "string", description: "YYYY-MM для month (опционально)" },
-          includeExcluded: { type: "number", description: "1 чтобы включить переводы" },
         },
         required: ["range"],
       },
@@ -230,7 +227,7 @@ export async function runTool(name: string, args: Record<string, unknown>): Prom
       const fromArg = args.from as string | undefined
       const toArg = args.to as string | undefined
       const month = args.month as string | undefined
-      const includeExcluded = args.includeExcluded === 1
+      const includeExcluded = false
       const now = new Date()
       const today = todayStr()
       let date_from: string
@@ -428,7 +425,7 @@ export async function runTool(name: string, args: Record<string, unknown>): Prom
     case "get_spending_summary": {
       const range = args.range as string
       const month = args.month as string | undefined
-      const includeExcluded = args.includeExcluded === 1
+      const includeExcluded = false
       const now = new Date()
       const today = todayStr()
       let date_from: string
@@ -501,7 +498,7 @@ export async function runTool(name: string, args: Record<string, unknown>): Prom
     case "get_spending_by_category": {
       const range = args.range as string
       const month = args.month as string | undefined
-      const includeExcluded = args.includeExcluded === 1
+      const includeExcluded = false
       const now = new Date()
       const today = todayStr()
       let date_from: string

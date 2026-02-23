@@ -64,9 +64,11 @@ function getSparklineData(expenses: Expense[], range: Range): { v: number }[] {
 export function SpendingSummary({ fadeUp, expenses, budget: budgetProp }: Props) {
   const [range, setRange] = useState<Range>("today")
   const budget = budgetProp ?? DEFAULT_BUDGET
+  /** Только расходы в бюджете — для суммы и графика, чтобы не искажать тенденцию. */
+  const inBudget = useMemo(() => expenses.filter((e) => !e.exclude_from_budget), [expenses])
   const filtered = useMemo(() => {
     const now = new Date()
-    return expenses.filter((e) => {
+    return inBudget.filter((e) => {
       const d = new Date(e.date)
       if (range === "today") return d.toDateString() === now.toDateString()
       if (range === "7d") {
@@ -79,9 +81,9 @@ export function SpendingSummary({ fadeUp, expenses, budget: budgetProp }: Props)
       }
       return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
     })
-  }, [expenses, range])
+  }, [inBudget, range])
   const spent = useMemo(() => filtered.reduce((s, e) => s + e.amount, 0), [filtered])
-  const sparkline = useMemo(() => getSparklineData(expenses, range), [expenses, range])
+  const sparkline = useMemo(() => getSparklineData(inBudget, range), [inBudget, range])
 
   return (
     <motion.div

@@ -152,13 +152,18 @@ export default function ExpensesPage() {
 
   const periodTotal = expenses.reduce((s, e) => s + e.amount, 0)
 
+  /** Только расходы в бюджете для графиков — не искажаем тенденцию. */
+  const expensesForCharts = useMemo(
+    () => expenses.filter((e) => !e.exclude_from_budget),
+    [expenses]
+  )
   const chartData = useMemo(() => {
     const byDay: Record<string, number> = {}
     const byCategory: Record<string, { name: string; value: number; fill: string }> = {}
     const byMerchant: Record<string, number> = {}
     const byPaymentMethod: Record<string, number> = { card: 0, cash: 0, other: 0 }
     const byDayByCategory: Record<string, Record<string, number>> = {}
-    expenses.forEach((e) => {
+    expensesForCharts.forEach((e) => {
       byDay[e.date] = (byDay[e.date] ?? 0) + e.amount
       const catLabel = getCategoryLabel(categories, e.category_id)
       if (!byCategory[e.category_id]) {
@@ -210,7 +215,7 @@ export default function ExpensesPage() {
       catNames,
       categoryColors: Object.fromEntries(categoryBreakdown.map((c, i) => [c.name, c.fill])),
     }
-  }, [expenses, categories])
+  }, [expensesForCharts, categories])
   const isSelectionMode = selectionMode
 
   const toggleSelect = useCallback((id: string) => {
