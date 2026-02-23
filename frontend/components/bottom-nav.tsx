@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LayoutDashboard, Wallet, Banknote, Plus, Receipt, Settings } from "lucide-react"
+import { LayoutDashboard, Wallet, Banknote, Plus, Receipt } from "lucide-react"
 import { motion } from "framer-motion"
 
 const NAV_ITEMS = [
@@ -11,7 +11,6 @@ const NAV_ITEMS = [
   { href: "/app/add", label: "Добавить", icon: Plus, isCenter: true },
   { href: "/app/expenses", label: "Расходы", icon: Receipt },
   { href: "/app/salary", label: "Зарплата", icon: Banknote },
-  { href: "/app/settings", label: "Ещё", icon: Settings },
 ]
 
 export function BottomNav() {

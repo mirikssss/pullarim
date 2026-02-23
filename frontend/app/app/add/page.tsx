@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import useSWR from "swr"
 import { motion, AnimatePresence } from "framer-motion"
 import { Mic, Check, X, Loader2, CreditCard, Banknote } from "lucide-react"
@@ -32,6 +33,7 @@ export default function AddPage() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({})
   const [duplicateExisting, setDuplicateExisting] = useState<{ id: string; merchant: string; date: string; amount: number } | null>(null)
 
+  const router = useRouter()
   const { data: categories = [] } = useSWR<Category[]>(categoriesKey(), fetcher)
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -73,7 +75,6 @@ export default function AddPage() {
         return
       }
       setFieldErrors({})
-      toast.success("Расход добавлен")
       setShowConfirm(false)
       setDuplicateExisting(null)
       setAmount("")
@@ -82,6 +83,8 @@ export default function AddPage() {
       setDate(todayISO())
       setNote("")
       setPaymentMethod("card")
+      toast.success("Расход добавлен")
+      router.push("/app/dashboard")
     } catch {
       toast.error("Ошибка сети")
     } finally {
