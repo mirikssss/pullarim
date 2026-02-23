@@ -107,24 +107,29 @@ export async function POST(request: NextRequest) {
   }
 
   if (!force_duplicate) {
+    const createdSince = new Date(Date.now() - 2 * 60 * 1000).toISOString()
     const { data: existing } = await supabase
       .from("expenses")
-      .select("id, merchant, date, amount")
+      .select("id, merchant, date, amount, created_at")
       .eq("user_id", user.id)
       .eq("date", date)
       .eq("amount", amount)
       .eq("merchant", merchant)
+      .gte("created_at", createdSince)
+      .order("created_at", { ascending: false })
+      .limit(1)
       .maybeSingle()
     if (existing) {
       return NextResponse.json(
         {
-          error: { code: "DUPLICATE", message: "Похожий расход уже есть: та же дата, сумма и название." },
+          error: { code: "DUPLICATE", message: "Похожий расход уже есть: та же дата, сумма, название и время добавления." },
           duplicate: true,
           existing: {
             id: existing.id,
             merchant: existing.merchant,
             date: existing.date,
             amount: existing.amount,
+            created_at: existing.created_at,
           },
         },
         { status: 409 }

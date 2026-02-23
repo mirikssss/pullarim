@@ -31,7 +31,7 @@ export default function AddPage() {
   const [showConfirm, setShowConfirm] = useState(false)
   const [saving, setSaving] = useState(false)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({})
-  const [duplicateExisting, setDuplicateExisting] = useState<{ id: string; merchant: string; date: string; amount: number } | null>(null)
+  const [duplicateExisting, setDuplicateExisting] = useState<{ id: string; merchant: string; date: string; amount: number; created_at?: string } | null>(null)
 
   const router = useRouter()
   const { data: categories = [] } = useSWR<Category[]>(categoriesKey(), fetcher)
@@ -287,12 +287,15 @@ export default function AddPage() {
           {duplicateExisting ? (
             <div className="flex flex-col gap-3 py-2">
               <p className="text-sm text-muted-foreground">
-                Уже есть расход с той же датой, суммой и названием:
+                Уже есть расход с той же датой, суммой, названием и временем добавления:
               </p>
               <div className="rounded-lg bg-secondary/50 p-3 text-sm">
                 <div className="font-medium text-foreground">{duplicateExisting.merchant}</div>
                 <div className="text-muted-foreground">
                   {formatUZS(duplicateExisting.amount)} · {new Date(duplicateExisting.date + "T12:00:00").toLocaleDateString("ru-RU", { day: "numeric", month: "short", year: "numeric" })}
+                  {duplicateExisting.created_at && (
+                    <> · добавлен {new Date(duplicateExisting.created_at).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}</>
+                  )}
                 </div>
               </div>
               <p className="text-xs text-muted-foreground">
