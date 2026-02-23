@@ -38,6 +38,34 @@ export default function AddPage() {
 
   const recognitionRef = useRef<SpeechRecognition | null>(null)
   const transcriptRef = useRef("")
+  const submittedRef = useRef(false)
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const sendTranscriptAndFill = (text: string) => {
+    if (!text || submittedRef.current) return
+    submittedRef.current = true
+    setIsRecording(false)
+    fetch("/api/assistant/voice-parse", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.amount) {
+          setAmount(String(data.amount))
+          setMerchant(data.merchant ?? "")
+          setDate(data.date ?? todayISO())
+          setCategory(data.category_id ?? "")
+          setFieldErrors({})
+          toast.success("Заполнено по голосу")
+        } else {
+          toast.error(data.error?.message ?? "Не удалось разобрать фразу")
+        }
+      })
+      .catch(() => toast.error("Ошибка сети"))
+      .finally(() => { submittedRef.current = false })
+  }
 
   useEffect(() => {
     const SpeechRecognitionAPI =
@@ -47,40 +75,42 @@ export default function AddPage() {
     if (!SpeechRecognitionAPI || !isRecording) return
 
     transcriptRef.current = ""
+    submittedRef.current = false
     const rec = new SpeechRecognitionAPI() as SpeechRecognition
     rec.continuous = true
     rec.lang = "ru-RU"
     rec.interimResults = true
 
+    const DEBOUNCE_MS = 700
+
     rec.onresult = (e: SpeechRecognitionEvent) => {
       for (let i = e.resultIndex; i < e.results.length; i++) {
-        if (e.results[i].isFinal) transcriptRef.current += " " + e.results[i][0].transcript
+        if (e.results[i].isFinal) {
+          transcriptRef.current += " " + e.results[i][0].transcript
+        }
       }
+      const text = transcriptRef.current.trim()
+      if (!text) return
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
+      debounceTimerRef.current = setTimeout(() => {
+        debounceTimerRef.current = null
+        try {
+          rec.abort()
+        } catch {
+          // ignore
+        }
+        sendTranscriptAndFill(text)
+      }, DEBOUNCE_MS)
     }
 
     rec.onend = () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current)
+        debounceTimerRef.current = null
+      }
       setIsRecording(false)
       const text = transcriptRef.current.trim()
-      if (!text) return
-      fetch("/api/assistant/voice-parse", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
-      })
-        .then((r) => r.json())
-        .then((data) => {
-          if (data.amount) {
-            setAmount(String(data.amount))
-            setMerchant(data.merchant ?? "")
-            setDate(data.date ?? todayISO())
-            setCategory(data.category_id ?? "")
-            setFieldErrors({})
-            toast.success("Заполнено по голосу")
-          } else {
-            toast.error(data.error?.message ?? "Не удалось разобрать фразу")
-          }
-        })
-        .catch(() => toast.error("Ошибка сети"))
+      if (text && !submittedRef.current) sendTranscriptAndFill(text)
     }
 
     rec.onerror = (e: SpeechRecognitionErrorEvent) => {
@@ -126,6 +156,10 @@ export default function AddPage() {
     }
 
     return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current)
+        debounceTimerRef.current = null
+      }
       try {
         rec.abort()
       } catch {
