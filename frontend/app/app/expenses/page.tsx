@@ -7,8 +7,8 @@ import {
   ResponsiveContainer,
   BarChart,
   Bar,
-  LineChart,
-  Line,
+  AreaChart,
+  Area,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -584,7 +584,7 @@ export default function ExpensesPage() {
             className="flex flex-col gap-6"
           >
             {/* Сводка за период */}
-            <div className="rounded-xl border border-border bg-card p-4 shadow-[var(--shadow-card)] grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div className="rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)] grid grid-cols-2 sm:grid-cols-4 gap-4">
               <div>
                 <p className="text-xs text-muted-foreground">Итого за период</p>
                 <p className="text-xl sm:text-2xl font-extrabold tabular-nums text-foreground">
@@ -620,44 +620,50 @@ export default function ExpensesPage() {
               </div>
             </div>
 
-            <div className="rounded-xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
-              <p className="text-sm font-medium text-foreground mb-4">Расходы по дням</p>
+            <div className="rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)]">
+              <p className="text-sm font-semibold text-foreground mb-4">Расходы по дням</p>
               <div className="h-56">
                 {chartData.spendingByDay.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={chartData.spendingByDay} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
+                    <AreaChart data={chartData.spendingByDay} margin={{ top: 12, right: 8, left: -24, bottom: 4 }}>
+                      <defs>
+                        <linearGradient id="expenses-by-day-gradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="var(--color-primary)" stopOpacity={0.35} />
+                          <stop offset="100%" stopColor="var(--color-primary)" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} opacity={0.6} />
                       <XAxis
                         dataKey="day"
                         axisLine={false}
                         tickLine={false}
-                        tick={{ fill: "var(--color-muted-foreground)", fontSize: 12, fontWeight: 600 }}
+                        tick={{ fill: "var(--color-muted-foreground)", fontSize: 11 }}
                       />
                       <YAxis
                         axisLine={false}
                         tickLine={false}
-                        tick={{ fill: "var(--color-muted-foreground)", fontSize: 13, fontWeight: 600 }}
+                        tick={{ fill: "var(--color-muted-foreground)", fontSize: 11 }}
                         tickFormatter={(v) => formatUZSShort(v)}
                       />
                       <Tooltip
+                        cursor={{ stroke: "var(--color-border)", strokeWidth: 1 }}
                         contentStyle={{
                           backgroundColor: "var(--color-card)",
                           border: "1px solid var(--color-border)",
-                          borderRadius: "8px",
-                          color: "var(--color-foreground)",
-                          fontSize: "12px",
+                          borderRadius: "12px",
+                          boxShadow: "var(--shadow-card)",
+                          padding: "12px 14px",
                         }}
                         formatter={(value: number) => [formatUZSShort(value), "Расход"]}
                       />
-                      <Line
+                      <Area
                         type="monotone"
                         dataKey="amount"
                         stroke="var(--color-primary)"
-                        strokeWidth={2}
-                        dot={{ fill: "var(--color-primary)", r: 3 }}
-                        activeDot={{ r: 4 }}
+                        strokeWidth={2.5}
+                        fill="url(#expenses-by-day-gradient)"
                       />
-                    </LineChart>
+                    </AreaChart>
                   </ResponsiveContainer>
                 ) : (
                   <p className="text-sm text-muted-foreground text-center py-6">Нет данных за период</p>
@@ -667,30 +673,31 @@ export default function ExpensesPage() {
 
             {/* По дням и категориям (stacked) */}
             {chartData.dailyByCategory.length > 0 && chartData.catNames.length > 0 && (
-              <div className="rounded-xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
-                <p className="text-sm font-medium text-foreground mb-4">По дням по категориям</p>
+              <div className="rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)]">
+                <p className="text-sm font-semibold text-foreground mb-4">По дням по категориям</p>
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartData.dailyByCategory} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
+                    <BarChart data={chartData.dailyByCategory} margin={{ top: 8, right: 8, left: -24, bottom: 4 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} opacity={0.6} />
                       <XAxis
                         dataKey="day"
                         axisLine={false}
                         tickLine={false}
-                        tick={{ fill: "var(--color-muted-foreground)", fontSize: 12, fontWeight: 600 }}
+                        tick={{ fill: "var(--color-muted-foreground)", fontSize: 11 }}
                       />
                       <YAxis
                         axisLine={false}
                         tickLine={false}
-                        tick={{ fill: "var(--color-muted-foreground)", fontSize: 13, fontWeight: 600 }}
+                        tick={{ fill: "var(--color-muted-foreground)", fontSize: 11 }}
                         tickFormatter={(v) => formatUZSShort(v)}
                       />
                       <Tooltip
                         contentStyle={{
                           backgroundColor: "var(--color-card)",
                           border: "1px solid var(--color-border)",
-                          borderRadius: "8px",
-                          color: "var(--color-foreground)",
+                          borderRadius: "12px",
+                          boxShadow: "var(--shadow-card)",
+                          padding: "12px 14px",
                           fontSize: "12px",
                         }}
                         formatter={(value: number) => [formatUZSShort(Number(value)), ""]}
@@ -716,7 +723,7 @@ export default function ExpensesPage() {
                           dataKey={name}
                           stackId="day"
                           fill={chartData.categoryColors[name] ?? "var(--color-muted)"}
-                          radius={[0, 0, 0, 0]}
+                          radius={[4, 4, 0, 0]}
                         />
                       ))}
                     </BarChart>
@@ -726,8 +733,8 @@ export default function ExpensesPage() {
             )}
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="rounded-xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
-                <p className="text-sm font-medium text-foreground mb-4">По категориям</p>
+              <div className="rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)]">
+                <p className="text-sm font-semibold text-foreground mb-4">По категориям</p>
                 <div className="h-64">
                   {chartData.categoryBreakdown.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
@@ -738,20 +745,22 @@ export default function ExpensesPage() {
                           nameKey="name"
                           cx="50%"
                           cy="50%"
+                          innerRadius={52}
                           outerRadius={80}
-                          label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                          paddingAngle={2}
+                          label={({ name, percent }) => (percent >= 0.08 ? `${name} ${(percent * 100).toFixed(0)}%` : "")}
                         >
                           {chartData.categoryBreakdown.map((_, index) => (
-                            <Cell key={index} fill={chartData.categoryBreakdown[index].fill} />
+                            <Cell key={index} fill={chartData.categoryBreakdown[index].fill} stroke="var(--color-card)" strokeWidth={2} />
                           ))}
                         </Pie>
                         <Tooltip
                           contentStyle={{
                             backgroundColor: "var(--color-card)",
                             border: "1px solid var(--color-border)",
-                            borderRadius: "8px",
-                            color: "var(--color-foreground)",
-                            fontSize: "12px",
+                            borderRadius: "12px",
+                            boxShadow: "var(--shadow-card)",
+                            padding: "12px 14px",
                           }}
                           formatter={(value: number) => [formatUZSShort(value), "Сумма"]}
                         />
@@ -763,8 +772,8 @@ export default function ExpensesPage() {
                 </div>
               </div>
 
-              <div className="rounded-xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
-                <p className="text-sm font-medium text-foreground mb-4">По способу оплаты</p>
+              <div className="rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)]">
+                <p className="text-sm font-semibold text-foreground mb-4">По способу оплаты</p>
                 <div className="h-64">
                   {chartData.paymentBreakdown.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
@@ -775,20 +784,22 @@ export default function ExpensesPage() {
                           nameKey="name"
                           cx="50%"
                           cy="50%"
+                          innerRadius={52}
                           outerRadius={80}
-                          label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                          paddingAngle={2}
+                          label={({ name, percent }) => (percent >= 0.08 ? `${name} ${(percent * 100).toFixed(0)}%` : "")}
                         >
                           {chartData.paymentBreakdown.map((_, index) => (
-                            <Cell key={index} fill={chartData.paymentBreakdown[index].fill} />
+                            <Cell key={index} fill={chartData.paymentBreakdown[index].fill} stroke="var(--color-card)" strokeWidth={2} />
                           ))}
                         </Pie>
                         <Tooltip
                           contentStyle={{
                             backgroundColor: "var(--color-card)",
                             border: "1px solid var(--color-border)",
-                            borderRadius: "8px",
-                            color: "var(--color-foreground)",
-                            fontSize: "12px",
+                            borderRadius: "12px",
+                            boxShadow: "var(--shadow-card)",
+                            padding: "12px 14px",
                           }}
                           formatter={(value: number) => [formatUZSShort(value), "Сумма"]}
                         />
@@ -801,22 +812,22 @@ export default function ExpensesPage() {
               </div>
             </div>
 
-            <div className="rounded-xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
-              <p className="text-sm font-medium text-foreground mb-4">Топ-10 мерчантов</p>
+            <div className="rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)]">
+              <p className="text-sm font-semibold text-foreground mb-4">Топ-10 мерчантов</p>
               <div className="h-72 min-h-[220px]">
                 {chartData.topMerchants.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart
                       data={chartData.topMerchants}
                       layout="vertical"
-                      margin={{ top: 4, right: 4, left: 0, bottom: 0 }}
+                      margin={{ top: 8, right: 8, left: 0, bottom: 4 }}
                     >
-                      <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" horizontal={false} />
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" horizontal={false} opacity={0.6} />
                       <XAxis
                         type="number"
                         axisLine={false}
                         tickLine={false}
-                        tick={{ fill: "var(--color-muted-foreground)", fontSize: 13, fontWeight: 600 }}
+                        tick={{ fill: "var(--color-muted-foreground)", fontSize: 11 }}
                         tickFormatter={(v) => formatUZSShort(v)}
                       />
                       <YAxis
@@ -825,20 +836,21 @@ export default function ExpensesPage() {
                         width={100}
                         axisLine={false}
                         tickLine={false}
-                        tick={{ fill: "var(--color-muted-foreground)", fontSize: 12, fontWeight: 600 }}
+                        tick={{ fill: "var(--color-muted-foreground)", fontSize: 11 }}
                         tickFormatter={(v) => (v.length > 14 ? v.slice(0, 12) + "…" : v)}
                       />
                       <Tooltip
+                        cursor={{ fill: "var(--color-muted)", fillOpacity: 0.1 }}
                         contentStyle={{
                           backgroundColor: "var(--color-card)",
                           border: "1px solid var(--color-border)",
-                          borderRadius: "8px",
-                          color: "var(--color-foreground)",
-                          fontSize: "12px",
+                          borderRadius: "12px",
+                          boxShadow: "var(--shadow-card)",
+                          padding: "12px 14px",
                         }}
                         formatter={(value: number) => [formatUZSShort(value), "Сумма"]}
                       />
-                      <Bar dataKey="value" fill="var(--color-chart-1)" radius={[0, 4, 4, 0]} barSize={20} />
+                      <Bar dataKey="value" fill="var(--color-chart-1)" radius={[0, 6, 6, 0]} barSize={24} />
                     </BarChart>
                   </ResponsiveContainer>
                 ) : (

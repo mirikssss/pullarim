@@ -57,6 +57,8 @@ export const expensesPostBodySchema = z.object({
   date: dateStr.optional().default(() => new Date().toISOString().slice(0, 10)),
   note: z.string().max(500).nullable().optional(),
   payment_method: paymentMethod,
+  /** Если true — добавить даже при совпадении даты, суммы и мерчанта (дубликат). */
+  force_duplicate: z.boolean().optional(),
 })
 
 export const expensesPatchBodySchema = z.object({

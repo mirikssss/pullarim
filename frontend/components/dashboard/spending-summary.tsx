@@ -7,8 +7,8 @@ import {
   AreaChart,
   Area,
 } from "recharts"
+import { Wallet, Target, TrendingDown } from "lucide-react"
 import { formatUZS } from "@/lib/formatters"
-import { fetcher, expensesKey } from "@/lib/api"
 import type { Expense } from "@/lib/types"
 
 const DEFAULT_BUDGET = 5_000_000
@@ -85,26 +85,29 @@ export function SpendingSummary({ fadeUp, expenses, budget: budgetProp }: Props)
   const spent = useMemo(() => filtered.reduce((s, e) => s + e.amount, 0), [filtered])
   const sparkline = useMemo(() => getSparklineData(inBudget, range), [inBudget, range])
 
+  const remaining = Math.max(0, budget - spent)
+  const budgetPct = budget > 0 ? Math.min(100, (spent / budget) * 100) : 0
+
   return (
     <motion.div
       variants={fadeUp}
-      className="rounded-xl border border-border bg-card p-4 shadow-[var(--shadow-card)]"
+      className="rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)] overflow-hidden"
     >
-      {/* Segmented Control */}
-      <div className="flex gap-1 p-1 rounded-lg bg-secondary mb-4">
+      {/* Segmented: День / Неделя / Месяц — как на референсе */}
+      <div className="flex gap-1 p-1.5 rounded-xl bg-secondary mb-4">
         {RANGES.map((r) => (
           <button
             key={r.key}
             onClick={() => setRange(r.key)}
-            className={`relative flex-1 py-1.5 text-xs font-medium rounded-md transition-colors ${
+            className={`relative flex-1 py-2 text-xs font-medium rounded-lg transition-colors ${
               range === r.key ? "text-foreground" : "text-muted-foreground hover:text-foreground/80"
             }`}
           >
             {range === r.key && (
               <motion.div
                 layoutId="spending-range"
-                className="absolute inset-0 rounded-md bg-card border border-border shadow-[var(--shadow-card)]"
-                transition={{ type: "spring", bounce: 0.15, duration: 0.5 }}
+                className="absolute inset-0 rounded-lg bg-card border border-border shadow-sm"
+                transition={{ type: "spring", bounce: 0.2, duration: 0.4 }}
               />
             )}
             <span className="relative z-10">{r.label}</span>
@@ -112,64 +115,85 @@ export function SpendingSummary({ fadeUp, expenses, budget: budgetProp }: Props)
         ))}
       </div>
 
-      {/* Total */}
-      <div className="flex items-end justify-between mb-3">
+      {/* Крупная сумма + мини-график в одной строке */}
+      <div className="flex items-start justify-between gap-4 mb-4">
         <div>
-          <p className="text-xs text-muted-foreground mb-0.5">Потрачено</p>
+          <p className="text-[10px] uppercase tracking-wide text-muted-foreground mb-0.5">Потрачено</p>
           <motion.p
             key={range}
             initial={{ opacity: 0, y: 4 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-2xl font-bold text-foreground"
+            className="text-2xl font-bold tabular-nums text-foreground"
           >
             {formatUZS(spent)}
           </motion.p>
         </div>
-        {range === "month" && (
-          <div className="text-right">
-            <p className="text-xs text-muted-foreground">Бюджет</p>
-            <p className="text-sm font-medium text-foreground">{formatUZS(budget)}</p>
+        {sparkline.length > 1 && (
+          <div className="h-10 w-24 shrink-0 rounded-lg bg-secondary/50 overflow-hidden">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={sparkline} margin={{ top: 2, right: 2, left: 2, bottom: 2 }}>
+                <defs>
+                  <linearGradient id="spark-gradient-modern" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="var(--color-primary)" stopOpacity={0.4} />
+                    <stop offset="100%" stopColor="var(--color-primary)" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <Area
+                  type="monotone"
+                  dataKey="v"
+                  stroke="var(--color-primary)"
+                  strokeWidth={1.5}
+                  fill="url(#spark-gradient-modern)"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
           </div>
         )}
       </div>
 
-      {/* Budget bar for month */}
+      {/* Сводка в стиле референса: при выборе «Месяц» — Бюджет / Потрачено / Осталось */}
       {range === "month" && (
-        <div className="mb-3">
-          <div className="h-1.5 rounded-full bg-secondary overflow-hidden">
-            <motion.div
-              initial={{ width: 0 }}
-              animate={{ width: `${Math.min(100, (spent / budget) * 100)}%` }}
-              transition={{ duration: 0.5, ease: "easeOut" }}
-              className={`h-full rounded-full ${spent > budget ? "bg-destructive" : "bg-primary"}`}
-            />
+        <div className="space-y-2 pt-2 border-t border-border">
+          <div className="flex items-center gap-3 py-1.5">
+            <div className="w-9 h-9 rounded-full bg-primary/15 flex items-center justify-center shrink-0">
+              <TrendingDown className="w-4 h-4 text-primary" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Потрачено</p>
+              <p className="text-sm font-semibold text-foreground">{formatUZS(spent)}</p>
+            </div>
           </div>
-          <p className="text-xs text-muted-foreground mt-1">
-            Осталось: {formatUZS(Math.max(0, budget - spent))}
-          </p>
-        </div>
-      )}
-
-      {/* Sparkline */}
-      {sparkline.length > 1 && (
-        <div className="h-12 mt-1">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={sparkline} margin={{ top: 2, right: 0, left: 0, bottom: 0 }}>
-              <defs>
-                <linearGradient id="spark-gradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="var(--color-primary)" stopOpacity={0.2} />
-                  <stop offset="100%" stopColor="var(--color-primary)" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <Area
-                type="monotone"
-                dataKey="v"
-                stroke="var(--color-primary)"
-                strokeWidth={1.5}
-                fill="url(#spark-gradient)"
+          <div className="flex items-center gap-3 py-1.5">
+            <div className="w-9 h-9 rounded-full bg-chart-2/20 flex items-center justify-center shrink-0">
+              <Target className="w-4 h-4 text-chart-2" style={{ color: "var(--color-chart-2)" }} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Бюджет</p>
+              <p className="text-sm font-semibold text-foreground">{formatUZS(budget)}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 py-1.5">
+            <div className="w-9 h-9 rounded-full bg-chart-3/20 flex items-center justify-center shrink-0">
+              <Wallet className="w-4 h-4 text-chart-3" style={{ color: "var(--color-chart-3)" }} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Осталось</p>
+              <p className="text-sm font-semibold text-foreground">{formatUZS(remaining)}</p>
+            </div>
+          </div>
+          <div className="pt-2">
+            <div className="h-2 rounded-full bg-secondary overflow-hidden">
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: `${budgetPct}%` }}
+                transition={{ duration: 0.6, ease: "easeOut" }}
+                className={`h-full rounded-full ${spent > budget ? "bg-destructive" : "bg-primary"}`}
               />
-            </AreaChart>
-          </ResponsiveContainer>
+            </div>
+            <p className="text-[10px] text-muted-foreground mt-1">
+              {spent > budget ? "Превышение бюджета" : "Прогресс по бюджету"}
+            </p>
+          </div>
         </div>
       )}
     </motion.div>

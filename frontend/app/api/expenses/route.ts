@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
       { status: 400 }
     )
   }
-  const { merchant, category_id, amount, date, note, payment_method } = parsed.data
+  const { merchant, category_id, amount, date, note, payment_method, force_duplicate } = parsed.data
 
   const supabase = await createClient()
   const exists = await categoryExists(supabase, category_id)
@@ -104,6 +104,32 @@ export async function POST(request: NextRequest) {
       validationErrorResponse("category_id does not exist", { category_id: ["Category not found"] }),
       { status: 400 }
     )
+  }
+
+  if (!force_duplicate) {
+    const { data: existing } = await supabase
+      .from("expenses")
+      .select("id, merchant, date, amount")
+      .eq("user_id", user.id)
+      .eq("date", date)
+      .eq("amount", amount)
+      .eq("merchant", merchant)
+      .maybeSingle()
+    if (existing) {
+      return NextResponse.json(
+        {
+          error: { code: "DUPLICATE", message: "Похожий расход уже есть: та же дата, сумма и название." },
+          duplicate: true,
+          existing: {
+            id: existing.id,
+            merchant: existing.merchant,
+            date: existing.date,
+            amount: existing.amount,
+          },
+        },
+        { status: 409 }
+      )
+    }
   }
 
   const { data, error } = await supabase
